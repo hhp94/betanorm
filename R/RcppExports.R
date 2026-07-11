@@ -13,3 +13,19 @@ beta_mixture_em_cpp <- function(y, initial_responsibility, nL = 3L, weights = NU
     .Call(`_bmiqpp_beta_mixture_em_cpp`, y, initial_responsibility, nL, weights, maxiter, tol, beta_maxit, beta_max_halving, beta_score_tol, min_shape, armijo, debug)
 }
 
+boost_digamma_cpp <- function(x) {
+    .Call(`_bmiqpp_boost_digamma_cpp`, x)
+}
+
+boost_trigamma_cpp <- function(x) {
+    .Call(`_bmiqpp_boost_trigamma_cpp`, x)
+}
+
+boost_pbeta_cpp <- function(q, shape1, shape2, lower_tail = TRUE) {
+    .Call(`_bmiqpp_boost_pbeta_cpp`, q, shape1, shape2, lower_tail)
+}
+
+boost_qbeta_cpp <- function(p, shape1, shape2, lower_tail = TRUE) {
+    .Call(`_bmiqpp_boost_qbeta_cpp`, p, shape1, shape2, lower_tail)
+}
+

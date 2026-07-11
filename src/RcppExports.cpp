@@ -64,11 +64,65 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// boost_digamma_cpp
+Rcpp::NumericVector boost_digamma_cpp(Rcpp::NumericVector x);
+RcppExport SEXP _bmiqpp_boost_digamma_cpp(SEXP xSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
+    rcpp_result_gen = Rcpp::wrap(boost_digamma_cpp(x));
+    return rcpp_result_gen;
+END_RCPP
+}
+// boost_trigamma_cpp
+Rcpp::NumericVector boost_trigamma_cpp(Rcpp::NumericVector x);
+RcppExport SEXP _bmiqpp_boost_trigamma_cpp(SEXP xSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
+    rcpp_result_gen = Rcpp::wrap(boost_trigamma_cpp(x));
+    return rcpp_result_gen;
+END_RCPP
+}
+// boost_pbeta_cpp
+Rcpp::NumericVector boost_pbeta_cpp(Rcpp::NumericVector q, double shape1, double shape2, bool lower_tail);
+RcppExport SEXP _bmiqpp_boost_pbeta_cpp(SEXP qSEXP, SEXP shape1SEXP, SEXP shape2SEXP, SEXP lower_tailSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type q(qSEXP);
+    Rcpp::traits::input_parameter< double >::type shape1(shape1SEXP);
+    Rcpp::traits::input_parameter< double >::type shape2(shape2SEXP);
+    Rcpp::traits::input_parameter< bool >::type lower_tail(lower_tailSEXP);
+    rcpp_result_gen = Rcpp::wrap(boost_pbeta_cpp(q, shape1, shape2, lower_tail));
+    return rcpp_result_gen;
+END_RCPP
+}
+// boost_qbeta_cpp
+Rcpp::NumericVector boost_qbeta_cpp(Rcpp::NumericVector p, double shape1, double shape2, bool lower_tail);
+RcppExport SEXP _bmiqpp_boost_qbeta_cpp(SEXP pSEXP, SEXP shape1SEXP, SEXP shape2SEXP, SEXP lower_tailSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type p(pSEXP);
+    Rcpp::traits::input_parameter< double >::type shape1(shape1SEXP);
+    Rcpp::traits::input_parameter< double >::type shape2(shape2SEXP);
+    Rcpp::traits::input_parameter< bool >::type lower_tail(lower_tailSEXP);
+    rcpp_result_gen = Rcpp::wrap(boost_qbeta_cpp(p, shape1, shape2, lower_tail));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_bmiqpp_scan_finite_unit_interval_cpp", (DL_FUNC) &_bmiqpp_scan_finite_unit_interval_cpp, 3},
     {"_bmiqpp_beta_est_newton_cpp", (DL_FUNC) &_bmiqpp_beta_est_newton_cpp, 8},
     {"_bmiqpp_beta_mixture_em_cpp", (DL_FUNC) &_bmiqpp_beta_mixture_em_cpp, 12},
+    {"_bmiqpp_boost_digamma_cpp", (DL_FUNC) &_bmiqpp_boost_digamma_cpp, 1},
+    {"_bmiqpp_boost_trigamma_cpp", (DL_FUNC) &_bmiqpp_boost_trigamma_cpp, 1},
+    {"_bmiqpp_boost_pbeta_cpp", (DL_FUNC) &_bmiqpp_boost_pbeta_cpp, 4},
+    {"_bmiqpp_boost_qbeta_cpp", (DL_FUNC) &_bmiqpp_boost_qbeta_cpp, 4},
     {NULL, NULL, 0}
 };
 

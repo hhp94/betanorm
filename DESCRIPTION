@@ -14,10 +14,12 @@ License: MIT + file LICENSE
 Depends:
     R (>= 4.3.0)
 Imports:
+    checkmate,
     Rcpp
 Suggests:
     testthat (>= 3.0.0)
 LinkingTo:
+    BH,
     Rcpp,
     RcppArmadillo,
     RcppThread

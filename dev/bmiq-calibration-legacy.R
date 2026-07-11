@@ -11,9 +11,9 @@
 # and fixed minor errors. Also he made the code more robust.
 # Importantly, SH changed the optimization algorithm to make it #more robust.
 # SH used method="Nelder-Mead" in optim() since the other #optimization method sometimes gets stuck.
-# Toward this end, the function blc was replaced by blc2.
+# Toward this end, the function blc was replaced by blc2 (now *.old).
 # Requires complete data (no NAs) in datM and goldstandard.beta.
-betaEst2 <- function(y, w, weights) {
+betaEst2.old <- function(y, w, weights) {
   if (length(y) <= 1) {
     return(c(1, 1))
   }
@@ -27,7 +27,7 @@ betaEst2 <- function(y, w, weights) {
   opt <- try(
     optim(
       logab,
-      betaObjf,
+      betaObjf.old,
       ydata = y,
       wdata = w,
       weights = weights,
@@ -40,8 +40,8 @@ betaEst2 <- function(y, w, weights) {
     return(c(1, 1))
   }
   exp(opt$par)
-} # end of function betaEst
-blc2 <- function(
+} # end of function betaEst.old
+blc2.old <- function(
   Y,
   w,
   maxiter = 25,
@@ -71,7 +71,7 @@ blc2 <- function(
     mu0 <- mu
     for (k in 1:K) {
       for (j in 1:J) {
-        ab <- betaEst2(Y[, j], w[, k], weights)
+        ab <- betaEst2.old(Y[, j], w[, k], weights)
         a[k, j] <- ab[1]
         b[k, j] <- ab[2]
         mu[k, j] <- ab[1] / sum(ab)
@@ -104,7 +104,7 @@ blc2 <- function(
   return(list(a = a, b = b, eta = eta, mu = mu, w = w, llike = sum(llike)))
 }
 
-# The function BMIQcalibration was created by Steve Horvath by heavily recycling code
+# The function BMIQcalibration.old was created by Steve Horvath by heavily recycling code
 # from A. Teschendorff's BMIQ function.
 # BMIQ stands for beta mixture quantile normalization.
 # Explanation: datM is a data frame with Illumina beta values (rows are samples, colums are CpGs.
@@ -113,8 +113,8 @@ blc2 <- function(
 # Both datM and goldstandard.beta must be finite and in [0, 1] (no NA/NaN/Inf, no values outside).
 # Example:
 # gold.mean=as.numeric(apply(datMeth,2,mean))
-# datMethCalibrated=BMIQcalibration(datM=datMeth,goldstandard.beta=gold.mean)
-BMIQcalibration <- function(
+# datMethCalibrated=BMIQcalibration.old(datM=datMeth,goldstandard.beta=gold.mean)
+BMIQcalibration.old <- function(
   datM,
   goldstandard.beta,
   nL = 3,
@@ -130,8 +130,8 @@ BMIQcalibration <- function(
       "Error in function arguments length(goldstandard.beta) !=dim(datM)[[2]]. Consider transposing datM."
     )
   }
-  assertFiniteUnitInterval(datM, "datM")
-  assertFiniteUnitInterval(goldstandard.beta, "goldstandard.beta")
+  assertFiniteUnitInterval.old(datM, "datM")
+  assertFiniteUnitInterval.old(goldstandard.beta, "goldstandard.beta")
   beta1.v <- goldstandard.beta
   ### estimate initial weight matrix from type1 distribution
   w0.m <- matrix(0, nrow = length(beta1.v), ncol = nL)
@@ -146,7 +146,7 @@ BMIQcalibration <- function(
     min(c(nfit, length(beta1.v))),
     replace = FALSE
   )
-  em1.o <- blc(
+  em1.o <- blc.old(
     matrix(beta1.v[rand.idx], ncol = 1),
     w = w0.m[rand.idx, ],
     maxiter = niter,
@@ -212,7 +212,7 @@ BMIQcalibration <- function(
       min(c(nfit, length(beta2.v))),
       replace = FALSE
     )
-    em2.o <- blc2(
+    em2.o <- blc2.old(
       Y = matrix(beta2.v[rand.idx], ncol = 1),
       w = w0.m[rand.idx, ],
       maxiter = niter,
@@ -322,16 +322,16 @@ BMIQcalibration <- function(
     datM[ii, ] <- nbeta2.v
   } # end of for (ii=1 loop
   datM
-} # end of function BMIQcalibration
+} # end of function BMIQcalibration.old
 
 # Vendored from RPMM (Houseman et al.); requires complete data (no NAs).
-betaObjf <- function(logab, ydata, wdata, weights) {
+betaObjf.old <- function(logab, ydata, wdata, weights) {
   ab <- exp(logab)
   -sum(wdata * weights * dbeta(ydata, ab[1], ab[2], log = TRUE))
 }
 
-# Vendored from RPMM betaEst (used by blc); BFGS optim, complete data only.
-betaEst <- function(y, w, weights) {
+# Vendored from RPMM betaEst.old (used by blc.old); BFGS optim, complete data only.
+betaEst.old <- function(y, w, weights) {
   if (length(y) <= 1) {
     return(c(1, 1))
   }
@@ -343,7 +343,7 @@ betaEst <- function(y, w, weights) {
     return(exp(logab))
   }
   opt <- try(
-    optim(logab, betaObjf, ydata = y, wdata = w, weights = weights, method = "BFGS"),
+    optim(logab, betaObjf.old, ydata = y, wdata = w, weights = weights, method = "BFGS"),
     silent = TRUE
   )
   if (inherits(opt, "try-error")) {
@@ -352,8 +352,8 @@ betaEst <- function(y, w, weights) {
   exp(opt$par)
 }
 
-# Vendored from RPMM blc; complete data only.
-blc <- function(
+# Vendored from RPMM blc.old; complete data only.
+blc.old <- function(
   Y,
   w,
   maxiter = 25,
@@ -383,7 +383,7 @@ blc <- function(
     mu0 <- mu
     for (k in 1:K) {
       for (j in 1:J) {
-        ab <- betaEst(Y[, j], w[, k], weights)
+        ab <- betaEst.old(Y[, j], w[, k], weights)
         a[k, j] <- ab[1]
         b[k, j] <- ab[2]
         mu[k, j] <- ab[1] / sum(ab)
@@ -417,7 +417,7 @@ blc <- function(
 }
 
 # Abort unless all values are finite and in [0, 1] (covers NA, NaN, +/-Inf, out-of-range).
-assertFiniteUnitInterval <- function(x, name) {
+assertFiniteUnitInterval.old <- function(x, name) {
   if (any(!is.finite(x))) {
     stop(
       name,
