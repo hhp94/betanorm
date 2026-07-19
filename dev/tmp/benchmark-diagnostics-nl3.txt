@@ -1,0 +1,178 @@
+$gold
+$gold$initial_class_counts
+[1] 13432  3267  3301
+
+$gold$eta
+          [,1]
+[1,] 0.6519266
+[2,] 0.1761522
+[3,] 0.1719212
+
+$gold$component_means
+[1] 0.05699728 0.46688069 0.84029743
+
+$gold$component_a
+[1]  2.312851  1.944063 14.488772
+
+$gold$component_b
+[1] 38.265415  2.219877  2.753661
+
+$gold$component_fit_status
+[1] "converged" "converged" "converged"
+
+$gold$component_fit_reason
+[1] "score tolerance reached" "score tolerance reached" "score tolerance reached"
+
+$gold$em_iterations
+[1] 5
+
+$gold$em_converged
+[1] FALSE
+
+$gold$parameter_criterion
+[1] 0.1031719
+
+$gold$loglik_criterion
+[1] 0.002459666
+
+$gold$log_likelihood
+[1] 16747.29
+
+$gold$subset_map_counts
+[1] 13176  3022  3802
+
+$gold$thresholds
+[1] 0.1779239 0.7009678
+
+$gold$complete_class_counts
+[1] 14107  3217  4044
+
+$gold$parameter_criterion_trace
+[1]       Inf 0.2551377 0.1594561 0.1239550 0.1031719
+
+$gold$loglik_criterion_trace
+[1]         Inf 0.012285139 0.004997891 0.003258575 0.002459666
+
+$gold$unmethylated_mode
+[1] 0.02945466
+
+$gold$methylated_mode
+[1] 0.870925
+
+
+$samples
+$samples[[1]]
+$samples[[1]]$sample_index
+[1] 1
+
+$samples[[1]]$sample_name
+[1] "CLHNS_6_EPICv1"
+
+$samples[[1]]$input_range
+[1] 0.000000 0.987739
+
+$samples[[1]]$low_mode_window_count
+[1] 15718
+
+$samples[[1]]$high_mode_window_count
+[1] 4589
+
+$samples[[1]]$unmethylated_mode
+[1] 0.03822939
+
+$samples[[1]]$methylated_mode
+[1] 0.8993623
+
+$samples[[1]]$unmethylated_shift
+[1] 0.008774729
+
+$samples[[1]]$methylated_shift
+[1] 0.02843727
+
+$samples[[1]]$initial_thresholds
+[1] 0.1866986 0.7294050
+
+$samples[[1]]$initial_class_counts
+[1] 13133  3424  3443
+
+$samples[[1]]$eta
+          [,1]
+[1,] 0.6664402
+[2,] 0.1665765
+[3,] 0.1669834
+
+$samples[[1]]$component_means
+[1] 0.05954631 0.46632352 0.84904380
+
+$samples[[1]]$component_a
+[1]  1.247409  2.721228 27.177706
+
+$samples[[1]]$component_b
+[1] 19.701151  3.114266  4.832075
+
+$samples[[1]]$component_fit_status
+[1] "converged" "converged" "converged"
+
+$samples[[1]]$component_fit_reason
+[1] "score tolerance reached" "score tolerance reached" "score tolerance reached"
+
+$samples[[1]]$em_iterations
+[1] 5
+
+$samples[[1]]$em_converged
+[1] FALSE
+
+$samples[[1]]$parameter_criterion
+[1] 0.03640292
+
+$samples[[1]]$loglik_criterion
+[1] 0.0002155115
+
+$samples[[1]]$log_likelihood
+[1] 15408.49
+
+$samples[[1]]$subset_map_counts
+[1] 13493  3010  3497
+
+$samples[[1]]$thresholds
+[1] 0.2222905 0.7243954
+
+$samples[[1]]$complete_class_counts
+[1] 14448  3207  3713
+
+$samples[[1]]$parameter_criterion_trace
+[1]        Inf 0.19803130 0.09097412 0.05334287 0.03640292
+
+$samples[[1]]$loglik_criterion_trace
+[1]          Inf 0.0080726779 0.0014337463 0.0004444931 0.0002155115
+
+$samples[[1]]$posterior_thresholds
+[1] 0.2222905 0.7243954
+
+$samples[[1]]$tail_counts
+ U_left U_right  M_left M_right 
+   9338    5110    1575    2138 
+
+$samples[[1]]$H_count
+[1] 4782
+
+$samples[[1]]$H_input_range
+[1] 0.2223585 0.8490312
+
+$samples[[1]]$H_output_anchors
+[1] 0.1650693 0.8434680
+
+$samples[[1]]$H_scale
+[1] 1.082541
+
+$samples[[1]]$output_range
+[1] 0.0000000 0.9967223
+
+$samples[[1]]$h_applied
+[1] TRUE
+
+$samples[[1]]$success
+[1] TRUE
+
+
+

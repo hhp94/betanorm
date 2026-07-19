@@ -1,0 +1,70 @@
+citHeader("If you use the original epigenetic clock (MEAT), please cite the article published in the Journal of Cachexia, Sarcopenia & Muscle. If you use the updated epigenetic clock (MEAT 2.0), please cite the BioRxiv paper.")
+
+citEntry(
+  entry="article",
+  author   = c(
+  person("Sarah","Voisin"),
+  person(c("Nicholas","R"),"Harvey"),
+  person(c("Larisa","M"),"Haupt"),
+  person(c("Lyn","R"),"Griffiths"),
+  person(c("Kevin","J"),"Ashton"),
+  person(c("Vernon","G"),"Coffey"),
+  person(c("Thomas","M"),"Doering"),
+  person(c("Jamie-Lee","M"),"Thompson"),
+  person("Christian","Benedict"),
+  person("Jonathan","Cedernaes"),
+  person(c("Malene","E"),"Lindholm"),
+  person(c("Jeffrey","M"),"Craig"),
+  person(c("David","S"),"Rowlands"),
+  person(c("Adam","P"),"Sharples"),
+  person("Steve","Horvath"),
+  person("Nir","Eynon")
+  ),
+  title    = "An epigenetic clock for human skeletal muscle",
+  journal = "Journal of cachexia, sarcopenia and muscle",
+  volume = 11,
+  issue = 4,
+  pages = 887,
+  year = 2020,
+
+  textVersion="Voisin S, Harvey NR, Haupt LM, Griffiths LR, Ashton KJ, Coffey VG, et al. An epigenetic clock for human skeletal muscle. J Cachexia Sarcopenia Muscle. Germany; 2020;11:887–98."
+)
+
+citEntry(
+  entry="article",
+  author   = c(
+  person("Sarah","Voisin"),
+  person("Macsue","Jacques"),
+  person("Shanie","Landen"),
+  person(c("Nicholas","R"),"Harvey"),
+  person(c("Larisa","M"),"Haupt"),
+  person(c("Lyn","R"),"Griffiths"),
+  person("Sofiya","Gancheva"),
+  person("Meriem","Ouni"),
+  person("Markus","Jähnert"),
+  person(c("Kevin","J"),"Ashton"),
+  person(c("Vernon","G"),"Coffey"),
+  person(c("Thomas","M"),"Doering"),
+  person(c("Jamie-Lee","M"),"Thompson"),
+  person("Anne","Gabory"),
+  person("Claudine","Junien"),
+  person("Robert","Caiazzo"),
+  person("Helene","Verkindt"),
+  person("Violetta","Raverdy"),
+  person("Francois","Pattou"),
+  person("Philippe","Froguel"),
+  person(c("Jeffrey","M"),"Craig"),
+  person("Sara","Blocquiaux"),
+  person("Martine","Thomis"),
+  person(c("Adam","P"),"Sharples"),
+  person("Annette","Schürmann"),
+  person("Michael","Roden"),
+  person("Steve","Horvath"),
+  person("Nir","Eynon")
+  ),
+  title    = "Meta-analysis of genome-wide DNA methylation and integrative OMICs of age in human skeletal muscle",
+  journal = "BioRxiv",
+  year = 2020,
+
+  textVersion="Voisin S, Jacques M, Landen S, Harvey NR, Haupt LM, Griffiths LR, et al. Meta-analysis of genome-wide DNA methylation and integrative OMICs in human skeletal muscle. bioRxiv [Internet]. 2020;2020.09.28.315838. Available from: http://biorxiv.org/content/early/2020/09/28/2020.09.28.315838.abstract"
+)

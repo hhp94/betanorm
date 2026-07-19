@@ -1,0 +1,182 @@
+---
+title: "MEAT (Muscle Epigenetic Age Test)"
+author:
+- name: "Sarah Voisin"
+  affiliation: "Institute for Health and Sport (IHES), Victoria University, Footscray, VIC 3011, Australia"
+  email: "sarah.voisin.aeris@gmail.com"
+package: MEAT
+bibliography: MEAT.bib
+date: "`r Sys.Date()`"
+output:  BiocStyle::html_vignette
+vignette: >
+  %\VignetteIndexEntry{MEAT}
+  %\VignetteEngine{knitr::knitr}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  fig.width = 8,
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r style, echo = FALSE, results = 'asis'}
+BiocStyle::markdown()
+```
+
+``` {R, setup, message=F} 
+library(knitr)
+```
+
+![](Ecorche_logo.jpg)
+
+# Introduction
+
+Welcome to MEAT (Muscle Epigenetic Age Test)! If you are reading these lines, you are probably an inquisitive scientist who has put a lot of effort into collecting skeletal muscle samples from -- hopefully -- consenting humans. Your coin purse (grant) is now lighter after profiling these muscle samples with the **Illumina HumanMethylation technology (HM27, HM450 and HMEPIC)** and you are yearning to know what the skeletal muscle epigenome has to say about your samples' age. I am here to guide you in your quest to find out how old your skeletal muscle samples are, by simply looking at their DNA methylation profiles. DNA methylation doesn't lie, but it can be tricky to understand what it says. Are you ready to undertake your quest to uncover the secrets of the muscle epigenome?
+
+You can view MEAT as a spellbook (package) that contains all the necessary spells (functions) to estimate epigenetic age in human skeletal muscle samples. However, the spells will only work if you cast them in a particular order (1. data cleaning, 2. data calibration, and 3. epigenetic age estimation). Starting from preprocessed data (matrix of beta-values that has been normalized/batch corrected, etc.), MEAT will estimate epigenetic age in each sample, based on a penalized regression model (elastic net regression) essentially similar to [Horvath's original pan-tissue clock](https://genomebiology.biomedcentral.com/articles/10.1186/gb-2013-14-10-r115). There are two versions of MEAT:
+* [the original version (MEAT)](https://onlinelibrary.wiley.com/doi/full/10.1002/jcsm.12556) that was built on 682 muscle samples from 12 independent datasets. This clock estimates epigenetic age based on 200 CpGs. To access the name and coefficients of these 200 CpGs, run:
+```{r Information on CpGs in MEAT, eval=FALSE}
+data("CpGs_in_MEAT",envir = environment())
+```
+* [the updated version (MEAT 2.0)](https://onlinelibrary.wiley.com/doi/full/10.1002/jcsm.12741) that was built on 1,053 samples from 16 independent datasets. This clock estimates epigenetic age based on 156 CpGs.To access the name and coefficients of these 156 CpGs, run:
+```{r Information on CpGs in MEAT2.0, eval=FALSE}
+data("CpGs_in_MEAT2.0",envir = environment())
+```
+For more information on MEAT and MEAT 2.0, see [our JCSM paper](https://onlinelibrary.wiley.com/doi/full/10.1002/jcsm.12741). You have the choice to use MEAT or MEAT 2.0 in this package.
+
+Once MEAT has calculated epigenetic age, you may provide the actual age of each sample (if known), so MEAT can also calculate age acceleration as the difference between epigenetic age and real age (AAdiff), and as the residuals from a linear regression of epigenetic age against real age (AAresid). For more information on the distinction between AAdiff and AAresid, see [our original paper](https://onlinelibrary.wiley.com/doi/full/10.1002/jcsm.12556).
+
+
+# Installation
+
+Install the MEAT package:
+```{r MEAT package installation, eval=FALSE}
+if (!requireNamespace("BiocManager", quietly=TRUE))
+    install.packages("BiocManager")
+BiocManager::install("MEAT")
+```
+
+Then, load the package:
+```{r MEAT package installation loading, message=FALSE, warning=FALSE}
+library(MEAT)
+```
+
+# Step-by-step guide
+
+## Data requirements
+
+To use this guide, you will need in your inventory:
+
+* **a matrix or data frame of beta-values**. Epigenetic age estimation will be more accurate if the beta matrix is already preprocessed using one of the many available R packages intended for this purpose (e.g. [ChAMP](https://bioconductor.org/packages/release/bioc/vignettes/ChAMP/inst/doc/ChAMP.html)). Preprocessing typically involves probe and sample filtering, normalisation of Type I and Type II probes, and correction for batch effects. The beta-matrix should have *CpGs in rows* and *samples in columns*, like this:
+```{r Methylation matrix presentation}
+data("GSE121961", envir = environment())
+```
+
+```{r Methylation matrix presentation table, echo = FALSE}
+kable(head(GSE121961),
+             caption = "Top rows of the GSE121961 matrix before cleaning and calibration.")
+```
+
+* **an optional phenotype table**. This phenotype table contains information on the samples provided in the beta-matrix, such as age (e.g. 0-122 years old for a human, 0-700 for an elf, 0-500 for a dwarf), sex (male, female, intersex), disease status (healthy/control, diseased/case/zombie delirium/hydrophobia/ogre poisoning), etc. The table should have *samples in rows* and *phenotypes in columns*, like this:
+```{r Phenotype table presentation}
+data("GSE121961_pheno", envir = environment())
+```
+
+```{r Phenotype table presentation table, echo = FALSE}
+kable(GSE121961_pheno,
+             caption = "Phenotypes corresponding to GSE121961.")
+```
+
+The phenotype table is useful if you want to discover the AA of your samples and to associate this AA with a phenotype of interest (e.g. do elves show systematically lower AA than humans, therefore explaining their exceptional longevity?)
+* **an optional annotation table**. This annotation table contains information on the CpGs in the beta-matrix, such as chromosome and genomic position, location with regards to CpG islands, closest or annotated gene, etc. This annotation table should contain *CpGs in rows* and *annotation in columns*.
+
+## Step 1: Data formatting
+
+A good adventurer never embarks a quest without a minimum of preparation. That is particularly true for your inventory! The beta matrix, the phenotype table and the annotation table should be all bundled up into a single object, to coordinate the meta-data and assays when subsetting. For example, if you have skeletal muscle DNA methylation profiles from humans, elves and dwarves, but you only want to select the samples from humans and elves, you can select these samples *in a single operation* in both the beta-matrix and phenotype table. This ensures the beta matrix, phenotype table and annotation table remain in sync.
+[SummarizedExperiment objects](https://bioconductor.org/packages/release/bioc/vignettes/SummarizedExperiment/inst/doc/SummarizedExperiment.html#introduction)) have the ideal format for your inventory. Let's create such an object with the beta matrix and optional phenotype and annotation tables. *Please ensure that you call the beta-matrix "beta"* as it is essential for the upcoming functions.
+```{r Data formatting, message=FALSE, warning=FALSE}
+library(SummarizedExperiment)
+GSE121961_SE <- SummarizedExperiment(assays=list(beta=GSE121961),
+colData=GSE121961_pheno)
+GSE121961_SE
+```
+
+## Step 2: Data cleaning
+
+The first important step is data 'cleaning', which essentially means *reducing the beta matrix to the CpGs common to all datasets used in the muscle clock*. If some of the CpGs are not present in your beta-matrix, these missing values will be imputed.
+```{r Data cleaning, message=FALSE, warning=FALSE}
+GSE121961_SE_clean <- clean_beta(SE = GSE121961_SE,
+                                 version = "MEAT2.0")
+```
+
+```{r Data cleaning table, echo = FALSE}
+kable(head(assays(GSE121961_SE_clean)$beta),
+             caption = "Top rows of the GSE121961 beta matrix after cleaning.")
+```
+
+## Step 3: Data calibration
+
+The second step is data 'calibration', which essentially means *re-scaling the DNA methylation profiles to that of the gold standard dataset used to develop the muscle clock*. This step harmonises differences in data processing, sample preparation, lab-to-lab variability, to obtain accurate measures of epigenetic age in your samples.
+Note that this 'calibration' is entirely different from the previously mentioned data preprocessing (i.e. probe and sample filtering, normalisation of Type I and Type II probes, and correction for batch effects). The calibration implemented in _BMIQcalibration()_ does use code from the original BMIQ algorithm, but it is **not** used to normalize TypeI and TypeII probe methylation distribution. The _BMIQcalibration()_ of the MEAT package re-scales the methylation distribution of your samples to the gold standard dataset GSE50498.
+```{r Data calibration, message=FALSE, warning=FALSE}
+GSE121961_SE_calibrated <- BMIQcalibration(SE = GSE121961_SE_clean,
+                                           version = "MEAT2.0")
+```
+
+```{r Data calibration table, echo=FALSE}
+kable(head(assays(GSE121961_SE_calibrated)$beta),
+             caption = "Top rows of the GSE121961 beta matrix after cleaning and calibration.")
+```
+
+You can have a look at the distribution of DNA methylation before and after calibration with a density plot. On this plot, each line is an individual sample, and you can clearly see the bimodal distribution of DNA methylation data, with most CpGs harboring very low methylation levels (left side of the graph), very few CpGs with intermediate methylation levels, and some CpGs with high methylation levels.
+Before calibration, the profiles do not align well with that of the gold standard, and this is problematic to obtain accurate estimates of epigenetic age. However, after calibration, the samples' profiles overlap nicely with that of the gold standard.
+```{r DNA methylation profile distribution before and after calibration, message=FALSE, warning=FALSE}
+data("gold.mean.MEAT2.0", envir = environment())
+GSE121961_SE_clean_with_gold_mean <- cbind(assays(GSE121961_SE_clean)$beta,
+                                           gold.mean.MEAT2.0$gold.mean) # add the gold mean
+GSE121961_SE_calibrated_with_gold_mean <- cbind(assays(GSE121961_SE_calibrated)$beta,
+                                                gold.mean.MEAT2.0$gold.mean) # add the gold mean
+groups <- c(rep("GSE121961",
+                ncol(GSE121961_SE_clean)), "Gold mean")
+
+library(minfi)
+par(mfrow = c(2, 1))
+densityPlot(GSE121961_SE_clean_with_gold_mean,
+  sampGroups = groups,
+  main = "Before calibration",
+  legend = FALSE
+)
+densityPlot(GSE121961_SE_calibrated_with_gold_mean,
+  sampGroups = groups,
+  main = "After calibration"
+)
+```
+
+## Step 4: Epigenetic age estimation
+
+Your quest is almost over! The only spell left to cast is _epiage_estimation()_ that uses methylation levels at the clock CpGs to estimate epigenetic age.
+If you do not have information on age, _epiage_estimation()_ will only return epigenetic age ("DNAmage"). However, if you have information on age (and other phenotypes), _epiage_estimation()_ will return:
+
+* epigenetic age (**DNAmage**)
+* age acceleration calculated as the difference between epigenetic age and actual age (**AAdiff**)
+* age acceleration calculated as the residuals of a regression of predicted age against actual age (**AAresid**) **if you have at least n > 2 samples in your beta-matrix**, since AAresid cannot be estimated with only n = 2 samples.
+
+While AAdiff is a straightforward way of calculating the error in age prediction, it is sensitive to the mean age of the dataset and to the pre-processing of the DNA methylation dataset; AAdiff can be biased upwards or downwards depending on how the dataset was normalized, and depending on the mean age and age variance of the dataset. In contrast, AAresid is insensitive to the mean age of the dataset and is robust against different pre-processing methods.
+```{r Epigenetic age estimation with phenotypes, message=FALSE, warning=FALSE}
+GSE121961_SE_epiage <- epiage_estimation(SE = GSE121961_SE_calibrated,
+                                         age_col_name = "Age",
+                                         version = "MEAT2.0")
+```
+
+```{r Epigenetic age estimation with phenotypes table, echo=FALSE}
+kable(colData(GSE121961_SE_epiage),
+             caption = "Phenotypes corresponding to GSE121961 with AAdiff for each sample.")
+```
+
+## Session information
+```{r session info}
+sessionInfo()
+```

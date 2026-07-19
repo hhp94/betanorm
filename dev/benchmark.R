@@ -1,52 +1,47 @@
-# =============================================================================
-# BMIQ: timing, agreement, and geometry (production only)
+# BMIQ density + calibrated-map plots
 #
-# Run from the package root:
+# From package root:
 #   source("dev/benchmark.R")
 #
-# Requires: bench, ggplot2, tidyr, dplyr (and the package itself via load_all).
-# Entry point: BMIQcalibration()  (nL = 3 and nL = 2)
-#
-# Production path: adaptive blc clipping + weighted-density intersection
-# thresholds + continuous H (nL=3); truncated U/M maps joined at gold cut
-# (nL=2).
-#
-# Plots include gold standard (target), sample before, and sample after
-# (nL=3 / nL=2 / nL=3 H-off).
-# =============================================================================
+# Requires: ggplot2, plotly (interactive HTML with click-to-toggle legend)
 
-stopifnot(requireNamespace("bench", quietly = TRUE))
 stopifnot(requireNamespace("ggplot2", quietly = TRUE))
-stopifnot(requireNamespace("tidyr", quietly = TRUE))
-stopifnot(requireNamespace("dplyr", quietly = TRUE))
-
-library(bench)
+stopifnot(requireNamespace("plotly", quietly = TRUE))
 library(ggplot2)
-library(tidyr)
-library(dplyr)
+library(plotly)
 
 devtools::load_all(".", quiet = TRUE)
+source("dev/bmiq-calibration-legacy.R", local = TRUE)
 
 # -----------------------------------------------------------------------------
-# Data: one sample aligned to Horvath gold standard
+# Data: one sample, gold aligned by probe name (not positional hope)
 # -----------------------------------------------------------------------------
 data("GPL21145_sample", envir = environment())
 data("horvath_goldstandard", envir = environment())
 
-gold <- as.numeric(horvath_goldstandard$goldstandard2)
-if (length(gold) != ncol(GPL21145_sample)) {
-  idx <- match(colnames(GPL21145_sample), horvath_goldstandard$Name)
-  gold <- as.numeric(horvath_goldstandard$goldstandard2[idx])
-}
+sample_i <- 5L
+stopifnot(sample_i >= 1L, sample_i <= nrow(GPL21145_sample))
 
-sample_i <- 1L
+probe_names <- colnames(GPL21145_sample)
+gold_idx <- match(probe_names, as.character(horvath_goldstandard$Name))
+if (anyNA(gold_idx)) {
+  stop(
+    sum(is.na(gold_idx)),
+    " sample probes not found in horvath_goldstandard$Name.",
+    call. = FALSE
+  )
+}
+gold <- as.numeric(horvath_goldstandard$goldstandard2)[gold_idx]
+
 dat1 <- GPL21145_sample[sample_i, , drop = FALSE]
-ok <- is.finite(dat1[1L, ]) &
+# Logical mask is positional on the 1-row matrix / gold vector (same probe order).
+ok <- is.finite(as.numeric(dat1[1L, ])) &
   is.finite(gold) &
-  dat1[1L, ] >= 0 &
-  dat1[1L, ] <= 1 &
+  as.numeric(dat1[1L, ]) >= 0 &
+  as.numeric(dat1[1L, ]) <= 1 &
   gold >= 0 &
   gold <= 1
+
 dat1 <- dat1[, ok, drop = FALSE]
 gold <- gold[ok]
 storage.mode(dat1) <- "double"
@@ -55,414 +50,142 @@ sample_id <- rownames(dat1)
 if (is.null(sample_id) || !nzchar(sample_id[[1L]])) {
   sample_id <- paste0("sample_", sample_i)
 }
-cpg_ids <- colnames(dat1)
-if (is.null(cpg_ids)) {
-  cpg_ids <- paste0("cg", seq_len(ncol(dat1)))
-}
 
-before_v <- as.numeric(dat1[1L, ])
+# 1-row matrix: as.numeric() is column-major, which is probe order for nrow == 1.
+before_v <- as.numeric(dat1)
 gold_v <- as.numeric(gold)
-n_zero <- sum(before_v == 0)
-n_one <- sum(before_v == 1)
-
-message(
-  "Benchmark data: 1 sample x ",
-  ncol(dat1),
-  " probes (sample = ",
-  sample_id,
-  "; exact 0s = ",
-  n_zero,
-  ", exact 1s = ",
-  n_one,
-  ")"
+stopifnot(
+  length(before_v) == ncol(dat1),
+  length(gold_v) == ncol(dat1),
+  isTRUE(all.equal(before_v, as.numeric(GPL21145_sample[sample_i, ok])))
 )
 
-run_bmiq <- function(nfit, nL = 3L, doH = NULL, debug = FALSE) {
-  BMIQcalibration(
+message(
+  "Benchmark data: sample_i=",
+  sample_i,
+  " (",
+  sample_id,
+  ") x ",
+  ncol(dat1),
+  " probes; cor(before, gold)=",
+  signif(cor(before_v, gold_v), 4)
+)
+
+nfit <- 20000L
+niter <- 5L
+
+run_bmiq <- function(nL) {
+  res <- bmiq_calibration(
     datM = dat1,
     goldstandard.beta = gold_v,
-    nL = as.integer(nL),
-    doH = doH,
-    nfit = as.integer(nfit),
-    niter = 5L,
+    nL = nL,
+    nfit = nfit,
+    niter = niter,
     tol = 0.001,
     verbose = FALSE,
-    debug = isTRUE(debug)
+    debug = TRUE
+  )
+  stopifnot(isTRUE(res$success[[1L]]))
+  calibrated <- as.numeric(res$calibrated[1L, ])
+  stopifnot(length(calibrated) == length(before_v), all(is.finite(calibrated)))
+  list(
+    calibrated = calibrated,
+    thresholds = as.numeric(res$diagnostics$samples[[1L]]$thresholds)
   )
 }
 
-# =============================================================================
-# 1) Timing: nL=3 vs nL=2  (nfit = 10000)
-# =============================================================================
-message("\n=== bench::mark (nfit = 10000, check = FALSE) ===")
+# -----------------------------------------------------------------------------
+# Calibrate: production nL = 2 / nL = 3, plus legacy nL = 3
+# -----------------------------------------------------------------------------
+message("Running bmiq_calibration(nL = 2) ...")
+nL2 <- run_bmiq(2L)
 
-bm <- bench::mark(
-  nL3 = run_bmiq(10000L, nL = 3L)$calibrated,
-  nL2 = run_bmiq(10000L, nL = 2L)$calibrated,
-  check = FALSE,
-  iterations = 3,
-  memory = TRUE
+message("Running bmiq_calibration(nL = 3) ...")
+nL3 <- run_bmiq(3L)
+
+message("Running legacy BMIQcalibration.old(nL = 3) ...")
+legacy_mat <- BMIQcalibration.old(
+  datM = dat1,
+  goldstandard.beta = gold_v,
+  nL = 3,
+  doH = TRUE,
+  nfit = nfit,
+  niter = niter,
+  tol = 0.001
+)
+stopifnot(nrow(legacy_mat) == 1L, ncol(legacy_mat) == length(before_v))
+legacy_v <- as.numeric(legacy_mat[1L, ])
+stopifnot(length(legacy_v) == length(before_v), all(is.finite(legacy_v)))
+
+# -----------------------------------------------------------------------------
+# Density: raw gold (empirical KDE of gold betas) + sample before / calibrated
+# Gold is NOT the fitted mixture density (no dbeta / eta reconstruction).
+# -----------------------------------------------------------------------------
+sample_series <- list(
+  before = before_v,
+  `nL=2` = nL2$calibrated,
+  `nL=3` = nL3$calibrated,
+  legacy = legacy_v
+)
+stopifnot(all(lengths(sample_series) == length(before_v)))
+
+sample_dens_df <- data.frame(
+  value = unlist(sample_series, use.names = FALSE),
+  type = factor(
+    rep(names(sample_series), times = lengths(sample_series)),
+    levels = names(sample_series)
+  )
 )
 
-print(bm)
-print(summary(bm))
-
-# =============================================================================
-# 2) Agreement: gold / before / nL3 / nL2 / nL3_noH  (nfit = 20000)
-# =============================================================================
-message("\n=== agreement run (nfit = 20000, 1 sample) ===")
-
-new3_res <- run_bmiq(20000L, nL = 3L, debug = TRUE)
-new2_res <- run_bmiq(20000L, nL = 2L, debug = TRUE)
-# Isolate U compression from H stitching (nL = 3, H off).
-new3_noH_res <- run_bmiq(20000L, nL = 3L, doH = FALSE, debug = TRUE)
-
-new_nL3_v <- as.numeric(new3_res$calibrated[1L, ])
-new_nL2_v <- as.numeric(new2_res$calibrated[1L, ])
-new_nL3_noH_v <- as.numeric(new3_noH_res$calibrated[1L, ])
-
-stopifnot(
-  length(before_v) == length(new_nL3_v),
-  length(before_v) == length(new_nL2_v),
-  length(before_v) == length(new_nL3_noH_v),
-  length(before_v) == length(gold_v),
-  length(before_v) == length(cpg_ids)
+# Empirical density of the raw gold-standard beta vector (same probes as sample).
+gold_dens_df <- data.frame(
+  value = gold_v,
+  type = factor("gold (raw)", levels = "gold (raw)")
 )
 
-make_long_block <- function(value, type) {
-  data.frame(
-    id = sample_id,
-    cpg = cpg_ids,
-    value = value,
-    type = type,
-    stringsAsFactors = FALSE
-  )
-}
-
-long <- rbind(
-  make_long_block(gold_v, "gold"),
-  make_long_block(before_v, "before"),
-  make_long_block(new_nL3_v, "nL3"),
-  make_long_block(new_nL2_v, "nL2"),
-  make_long_block(new_nL3_noH_v, "nL3_noH")
+type_cols <- c(
+  "gold (raw)" = "#E45756",
+  "before" = "#4C78A8",
+  "nL=2" = "#F58518",
+  "nL=3" = "#54A24B",
+  "legacy" = "#B279A2"
 )
 
-wide <- long |>
-  tidyr::pivot_wider(names_from = type, values_from = value) |>
-  dplyr::mutate(
-    abs_diff_nL3_nL2 = abs(nL3 - nL2),
-    abs_diff_before_gold = abs(before - gold),
-    abs_diff_nL3_gold = abs(nL3 - gold),
-    abs_diff_nL2_gold = abs(nL2 - gold),
-    abs_diff_nL3_noH_gold = abs(nL3_noH - gold),
-    delta_nL3 = nL3 - before,
-    delta_nL2 = nL2 - before
-  )
+p_density <- ggplot() +
+  geom_density(
+    data = sample_dens_df,
+    aes(x = value, colour = type, fill = type),
+    alpha = 0.10,
+    linewidth = 0.8
+  ) +
+  # Reference: kernel density of raw gold betas only (not EM mixture fit).
+  geom_density(
+    data = gold_dens_df,
+    aes(x = value, colour = type, fill = type),
+    alpha = 0.05,
+    linewidth = 1.1,
+    linetype = "dashed"
+  ) +
+  # Do not use scale_x limits here — they drop mass and warp the KDE near 0/1.
+  coord_cartesian(xlim = c(0, 1)) +
+  scale_colour_manual(values = type_cols, breaks = names(type_cols)) +
+  scale_fill_manual(values = type_cols, breaks = names(type_cols)) +
+  labs(
+    title = paste0("Beta density (", sample_id, ", i=", sample_i, ")"),
+    subtitle = "raw gold-standard density (empirical) vs sample before / calibrated",
+    x = "beta",
+    y = "density",
+    colour = NULL,
+    fill = NULL
+  ) +
+  theme_bw(base_size = 12) +
+  theme(legend.position = "top")
 
-message("abs(nL3 - nL2) summary:")
-print(summary(wide$abs_diff_nL3_nL2))
-message("abs(before - gold) summary:")
-print(summary(wide$abs_diff_before_gold))
-message("abs(nL3 - gold) summary:")
-print(summary(wide$abs_diff_nL3_gold))
-message("abs(nL2 - gold) summary:")
-print(summary(wide$abs_diff_nL2_gold))
-message("abs(nL3_noH - gold) summary:")
-print(summary(wide$abs_diff_nL3_noH_gold))
-
-summ_diff <- function(x, label) {
-  message(
-    label,
-    ": max = ",
-    signif(max(x, na.rm = TRUE), 8),
-    "; mean = ",
-    signif(mean(x, na.rm = TRUE), 8),
-    "; median = ",
-    signif(median(x, na.rm = TRUE), 8)
-  )
-}
-summ_diff(wide$abs_diff_nL3_nL2, "max/mean/median |nL3 - nL2|")
-summ_diff(wide$abs_diff_before_gold, "max/mean/median |before - gold|")
-summ_diff(wide$abs_diff_nL3_gold, "max/mean/median |nL3 - gold|")
-summ_diff(wide$abs_diff_nL2_gold, "max/mean/median |nL2 - gold|")
-summ_diff(wide$abs_diff_nL3_noH_gold, "max/mean/median |nL3_noH - gold|")
-
-message(
-  "cor(*, gold): before=",
-  signif(cor(before_v, gold_v), 6),
-  "; nL3=",
-  signif(cor(new_nL3_v, gold_v), 6),
-  "; nL2=",
-  signif(cor(new_nL2_v, gold_v), 6),
-  "; nL3_noH=",
-  signif(cor(new_nL3_noH_v, gold_v), 6)
-)
-message(
-  "cor(before, nL3)=",
-  signif(cor(before_v, new_nL3_v), 6),
-  "; cor(before, nL2)=",
-  signif(cor(before_v, new_nL2_v), 6),
-  "; cor(nL3, nL2)=",
-  signif(cor(new_nL3_v, new_nL2_v), 6)
-)
-
-# =============================================================================
-# 3) Geometry checks (component means, thresholds, H anchors, boundary jumps)
-# =============================================================================
-message("\n=== geometry checks (debug) ===")
-
-geom_report <- function(res, label, raw = before_v, cal = NULL) {
-  if (is.null(cal)) {
-    cal <- as.numeric(res$calibrated[1L, ])
-  }
-  d <- res$diagnostics$samples[[1L]]
-  mu <- as.numeric(d$component_means)
-  thr <- as.numeric(d$thresholds)
-  nL <- length(mu)
-
-  cat("\n-- ", label, " --\n", sep = "")
-  cat("  component means: ", paste(signif(mu, 5), collapse = ", "), "\n", sep = "")
-  cat("  thresholds:      ", paste(signif(thr, 5), collapse = ", "), "\n", sep = "")
-  cat(
-    "  a shapes:        ",
-    paste(signif(as.numeric(d$component_a), 5), collapse = ", "),
-    "\n",
-    sep = ""
-  )
-  cat(
-    "  b shapes:        ",
-    paste(signif(as.numeric(d$component_b), 5), collapse = ", "),
-    "\n",
-    sep = ""
-  )
-  cat(
-    "  eta:             ",
-    paste(signif(as.numeric(d$eta), 5), collapse = ", "),
-    "\n",
-    sep = ""
-  )
-
-  # Thresholds should be weighted-density crossings (recompute from fit).
-  a <- as.numeric(d$component_a)
-  b <- as.numeric(d$component_b)
-  eta <- as.numeric(d$eta)
-  expected_thr <- tryCatch(
-    thresholdsFromDensityCrossings(
-      a = a,
-      b = b,
-      eta = eta,
-      component.means = mu,
-      context = "benchmark-recompute"
-    ),
-    error = function(e) e
-  )
-  if (inherits(expected_thr, "error")) {
-    cat(
-      "  density-crossing recompute failed: ",
-      conditionMessage(expected_thr),
-      "\n",
-      sep = ""
-    )
-  } else {
-    thr_ok <- isTRUE(all.equal(thr, expected_thr, tolerance = 1e-8))
-    cat("  thresholds == density crossings? ", thr_ok, "\n", sep = "")
-    mean_mid <- (mu[-nL] + mu[-1L]) / 2
-    cat(
-      "  |thr - mean midpoint|: ",
-      paste(signif(abs(thr - mean_mid), 4), collapse = ", "),
-      "\n",
-      sep = ""
-    )
-  }
-
-  if (nL >= 3L) {
-    inside <- mu[2L] > thr[1L] && mu[2L] < thr[2L]
-    ordered <- mu[1L] < thr[1L] &&
-      thr[1L] < mu[2L] &&
-      mu[2L] < thr[2L] &&
-      thr[2L] < mu[3L]
-    cat(
-      "  mu_H inside H band? ",
-      inside,
-      "  [not required for density MAP]\n",
-      sep = ""
-    )
-    cat("  full U < t1 < H < t2 < M geometry? ", ordered, "\n", sep = "")
-  } else {
-    cat(
-      "  mu_U < t < mu_M? ",
-      mu[1L] < thr[1L] && thr[1L] < mu[2L],
-      "\n",
-      sep = ""
-    )
-    if (!is.null(d$nl2_gold_threshold)) {
-      cat(
-        "  nL=2 gold cut t_g: ",
-        signif(d$nl2_gold_threshold, 5),
-        "\n",
-        sep = ""
-      )
-    }
-  }
-
-  # Class labels from thresholds (lower-class equality).
-  cls <- rep.int(1L, length(raw))
-  for (b in seq_along(thr)) {
-    cls[raw > thr[b]] <- b + 1L
-  }
-  cat(
-    "  class counts:     ",
-    paste(tabulate(cls, nL), collapse = " / "),
-    "\n",
-    sep = ""
-  )
-
-  # Boundary jumps on observed probes: g(upper class min) - g(lower class max).
-  for (b in seq_along(thr)) {
-    lower <- which(cls == b)
-    upper <- which(cls == b + 1L)
-    if (length(lower) && length(upper)) {
-      jump <- min(cal[upper]) - max(cal[lower])
-      cat(
-        "  jump class ",
-        b,
-        "|",
-        b + 1L,
-        " (min upper - max lower): ",
-        signif(jump, 5),
-        "\n",
-        sep = ""
-      )
-    }
-  }
-
-  # Monotonicity / displacement of the observed map.
-  o <- order(raw, cal)
-  mono_viol <- sum(diff(cal[o]) < -1e-12)
-  cat("  rank inversions (order by raw then cal): ", mono_viol, "\n", sep = "")
-  cat(
-    "  max |cal - raw|: ",
-    signif(max(abs(cal - raw)), 5),
-    "; mean |cal - raw|: ",
-    signif(mean(abs(cal - raw)), 5),
-    "\n",
-    sep = ""
-  )
-  cat(
-    "  max |cal - gold|: ",
-    signif(max(abs(cal - gold_v)), 5),
-    "; mean |cal - gold|: ",
-    signif(mean(abs(cal - gold_v)), 5),
-    "\n",
-    sep = ""
-  )
-
-  h_applied <- res$h.applied[1L]
-  cat("  h.applied: ", h_applied, "\n", sep = "")
-  if (isTRUE(h_applied)) {
-    cat(
-      "  H input range:    ",
-      paste(signif(d$H_input_range, 5), collapse = " -> "),
-      "\n",
-      sep = ""
-    )
-    cat(
-      "  H output anchors: ",
-      paste(signif(d$H_output_anchors, 5), collapse = " -> "),
-      "\n",
-      sep = ""
-    )
-    cat("  H scale (hf):     ", signif(d$H_scale, 5), "\n", sep = "")
-    # Continuous stitch: left H anchor should equal max calibrated U.
-    u_idx <- which(cls == 1L)
-    if (length(u_idx)) {
-      cat(
-        "  nminH - max(cal U): ",
-        signif(d$H_output_anchors[1L] - max(cal[u_idx]), 5),
-        "\n",
-        sep = ""
-      )
-    }
-  }
-
-  invisible(list(
-    means = mu,
-    thresholds = thr,
-    class = cls,
-    h.applied = h_applied,
-    diagnostics = d
-  ))
-}
-
-geom_nL3 <- geom_report(new3_res, "nL=3 (H on)")
-geom_nL3_noH <- geom_report(new3_noH_res, "nL=3 (H off)")
-geom_nL2 <- geom_report(new2_res, "nL=2 (truncated maps)")
-
-# nL=2: cut gap should be ~0 under truncated maps (continuous join at t_g).
-if (length(geom_nL2$thresholds) == 1L) {
-  t2 <- geom_nL2$thresholds[1L]
-  left <- which(before_v <= t2)
-  right <- which(before_v > t2)
-  if (length(left) && length(right)) {
-    gap <- min(new_nL2_v[right]) - max(new_nL2_v[left])
-    message(
-      "nL=2 cut gap (min M - max U): ",
-      signif(gap, 5),
-      if (gap < -1e-8) {
-        "  [DOWNWARD — rank inversion risk]"
-      } else if (abs(gap) < 1e-4) {
-        "  [~continuous]"
-      } else {
-        "  [non-negative]"
-      }
-    )
-  }
-}
-
-# Gold mixture geometry (from nL=3 run diagnostics if present).
-if (!is.null(new3_res$diagnostics$gold)) {
-  g <- new3_res$diagnostics$gold
-  cat("\n-- gold-standard mixture (from nL=3 fit) --\n")
-  cat(
-    "  component means: ",
-    paste(signif(as.numeric(g$component_means), 5), collapse = ", "),
-    "\n",
-    sep = ""
-  )
-  cat(
-    "  thresholds:      ",
-    paste(signif(as.numeric(g$thresholds), 5), collapse = ", "),
-    "\n",
-    sep = ""
-  )
-  cat(
-    "  a shapes:        ",
-    paste(signif(as.numeric(g$component_a), 5), collapse = ", "),
-    "\n",
-    sep = ""
-  )
-  cat(
-    "  b shapes:        ",
-    paste(signif(as.numeric(g$component_b), 5), collapse = ", "),
-    "\n",
-    sep = ""
-  )
-  cat(
-    "  eta:             ",
-    paste(signif(as.numeric(g$eta), 5), collapse = ", "),
-    "\n",
-    sep = ""
-  )
-}
-
-# =============================================================================
-# 4) Dense-grid mapping function (observed nearest-neighbor step map)
-# =============================================================================
-# BMIQ is probe-set based; approximate the map as the isotonic nearest-neighbour
-# of observed (raw -> cal) pairs so we can plot g(x) on a dense beta grid.
-message("\n=== dense-grid map approximation ===")
-
+# -----------------------------------------------------------------------------
+# Calibrated map: raw beta -> calibrated (dense-grid nearest-neighbor approx)
+# -----------------------------------------------------------------------------
 approx_map <- function(raw, cal, grid) {
+  stopifnot(length(raw) == length(cal))
   o <- order(raw)
   x <- raw[o]
   y <- cal[o]
@@ -475,210 +198,31 @@ grid <- seq(0.001, 0.999, length.out = 500L)
 map_df <- data.frame(
   beta = rep(grid, 3L),
   calibrated = c(
-    approx_map(before_v, new_nL3_v, grid),
-    approx_map(before_v, new_nL2_v, grid),
-    approx_map(before_v, new_nL3_noH_v, grid)
+    approx_map(before_v, nL2$calibrated, grid),
+    approx_map(before_v, nL3$calibrated, grid),
+    approx_map(before_v, legacy_v, grid)
   ),
   method = factor(
-    rep(c("nL3", "nL2", "nL3_noH"), each = length(grid)),
-    levels = c("nL3", "nL2", "nL3_noH")
+    rep(c("nL=2", "nL=3", "legacy"), each = length(grid)),
+    levels = c("nL=2", "nL=3", "legacy")
   )
 )
-
-# Finite-difference slopes near class boundaries for nL=3.
-if (length(geom_nL3$thresholds) >= 1L) {
-  thr3 <- geom_nL3$thresholds
-  g3 <- approx_map(before_v, new_nL3_v, grid)
-  for (t in thr3) {
-    i <- which.min(abs(grid - t))
-    i_lo <- max(1L, i - 3L)
-    i_hi <- min(length(grid), i + 3L)
-    slope_left <- (g3[i] - g3[i_lo]) / (grid[i] - grid[i_lo])
-    slope_right <- (g3[i_hi] - g3[i]) / (grid[i_hi] - grid[i])
-    message(
-      "nL3 slope near t=",
-      signif(t, 4),
-      ": left=",
-      signif(slope_left, 4),
-      ", right=",
-      signif(slope_right, 4),
-      ", ratio=",
-      signif(slope_right / slope_left, 4)
-    )
-  }
-}
-
-# nL=2 slopes near the single cut.
-if (length(geom_nL2$thresholds) == 1L) {
-  t2 <- geom_nL2$thresholds[1L]
-  g2 <- approx_map(before_v, new_nL2_v, grid)
-  i <- which.min(abs(grid - t2))
-  i_lo <- max(1L, i - 3L)
-  i_hi <- min(length(grid), i + 3L)
-  slope_left <- (g2[i] - g2[i_lo]) / (grid[i] - grid[i_lo])
-  slope_right <- (g2[i_hi] - g2[i]) / (grid[i_hi] - grid[i])
-  message(
-    "nL2 slope near t=",
-    signif(t2, 4),
-    ": left=",
-    signif(slope_left, 4),
-    ", right=",
-    signif(slope_right, 4),
-    ", ratio=",
-    signif(slope_right / slope_left, 4)
-  )
-}
-
-# Scatter helper
-scatter_theme <- theme_bw(base_size = 12) +
-  theme(aspect.ratio = 1)
-
-scatter_pair <- function(data, x, y, title, subtitle = NULL) {
-  ggplot(data, aes(x = .data[[x]], y = .data[[y]])) +
-    geom_point(alpha = 0.15, size = 0.4) +
-    geom_abline(slope = 1, intercept = 0, colour = "red", linetype = 2) +
-    coord_equal(xlim = c(0, 1), ylim = c(0, 1)) +
-    labs(title = title, x = x, y = y, subtitle = subtitle) +
-    scatter_theme
-}
-
-# Gold target scatters (before / after calibration)
-p_before_gold <- scatter_pair(
-  wide,
-  "gold",
-  "before",
-  "Gold vs before (sample)",
-  paste0("mean |diff| = ", signif(mean(wide$abs_diff_before_gold), 4))
-)
-p_nL3_gold <- scatter_pair(
-  wide,
-  "gold",
-  "nL3",
-  "Gold vs nL=3 (after)",
-  paste0("mean |diff| = ", signif(mean(wide$abs_diff_nL3_gold), 4))
-)
-p_nL2_gold <- scatter_pair(
-  wide,
-  "gold",
-  "nL2",
-  "Gold vs nL=2 (after)",
-  paste0("mean |diff| = ", signif(mean(wide$abs_diff_nL2_gold), 4))
-)
-
-# Sample path scatters
-p_before_nL3 <- scatter_pair(wide, "before", "nL3", "Before vs nL=3")
-p_before_nL2 <- scatter_pair(wide, "before", "nL2", "Before vs nL=2")
-p_nL3_nL2 <- scatter_pair(
-  wide,
-  "nL3",
-  "nL2",
-  "nL=3 vs nL=2",
-  paste0("mean |diff| = ", signif(mean(wide$abs_diff_nL3_nL2), 4))
-)
-p_before_nL3_noH <- scatter_pair(
-  wide,
-  "before",
-  "nL3_noH",
-  "Before vs nL=3 (H off)"
-)
-
-# Diff histograms — emphasize distance to gold
-diff_long <- tidyr::pivot_longer(
-  wide,
-  cols = c(
-    abs_diff_before_gold,
-    abs_diff_nL3_gold,
-    abs_diff_nL2_gold,
-    abs_diff_nL3_noH_gold,
-    abs_diff_nL3_nL2
-  ),
-  names_to = "pair",
-  values_to = "abs_diff"
-)
-diff_long$pair <- factor(
-  diff_long$pair,
-  levels = c(
-    "abs_diff_before_gold",
-    "abs_diff_nL3_gold",
-    "abs_diff_nL2_gold",
-    "abs_diff_nL3_noH_gold",
-    "abs_diff_nL3_nL2"
-  ),
-  labels = c(
-    "|before - gold|",
-    "|nL3 - gold|",
-    "|nL2 - gold|",
-    "|nL3_noH - gold|",
-    "|nL3 - nL2|"
-  )
-)
-
-p_abs_hist <- ggplot(diff_long, aes(x = abs_diff)) +
-  geom_histogram(bins = 60, fill = "grey40", colour = NA) +
-  scale_x_continuous(trans = "sqrt") +
-  facet_wrap(~pair, scales = "free_y", ncol = 3) +
-  labs(
-    title = "Absolute differences (vs gold and method pairs)",
-    x = "abs(diff) (sqrt scale)",
-    y = "count"
-  ) +
-  theme_bw(base_size = 12)
-
-# Overlaid densities: gold / before / nL3 / nL2
-long_plot <- long[long$type %in% c("gold", "before", "nL3", "nL2"), ]
-long_plot$type <- factor(
-  long_plot$type,
-  levels = c("gold", "before", "nL3", "nL2")
-)
-type_cols <- c(
-  gold = "#E45756",
-  before = "#4C78A8",
-  nL3 = "#54A24B",
-  nL2 = "#B279A2"
-)
-
-p_density <- ggplot(long_plot, aes(x = value, colour = type, fill = type)) +
-  geom_density(alpha = 0.10, linewidth = 0.8) +
-  scale_x_continuous(limits = c(0, 1), expand = c(0.01, 0)) +
-  scale_colour_manual(values = type_cols) +
-  scale_fill_manual(values = type_cols) +
-  labs(
-    title = "Beta density: gold / before / nL=3 / nL=2",
-    x = "beta",
-    y = "density",
-    colour = NULL,
-    fill = NULL
-  ) +
-  theme_bw(base_size = 12) +
-  theme(legend.position = "top")
 
 map_cols <- c(
-  nL3 = "#54A24B",
-  nL2 = "#B279A2",
-  nL3_noH = "#72B7B2"
+  "nL=2" = "#F58518",
+  "nL=3" = "#54A24B",
+  "legacy" = "#B279A2"
 )
 
 p_map <- ggplot(map_df, aes(x = beta, y = calibrated, colour = method)) +
   geom_abline(slope = 1, intercept = 0, colour = "grey70", linetype = 3) +
   geom_line(linewidth = 0.7, alpha = 0.9) +
   {
-    if (length(geom_nL3$thresholds)) {
+    if (length(nL3$thresholds)) {
       geom_vline(
-        xintercept = geom_nL3$thresholds,
+        xintercept = nL3$thresholds,
         colour = "grey40",
         linetype = 2,
-        linewidth = 0.4
-      )
-    } else {
-      NULL
-    }
-  } +
-  {
-    if (length(geom_nL2$thresholds) == 1L) {
-      geom_vline(
-        xintercept = geom_nL2$thresholds,
-        colour = "#B279A2",
-        linetype = 3,
         linewidth = 0.4
       )
     } else {
@@ -688,8 +232,8 @@ p_map <- ggplot(map_df, aes(x = beta, y = calibrated, colour = method)) +
   coord_equal(xlim = c(0, 1), ylim = c(0, 1)) +
   scale_colour_manual(values = map_cols) +
   labs(
-    title = "Calibrated map g(beta) on dense grid (NN / linear approx)",
-    subtitle = "Grey dashed: nL=3 cuts; purple dotted: nL=2 cut",
+    title = paste0("Calibrated map g(beta) (", sample_id, ", i=", sample_i, ")"),
+    subtitle = "Grey dashed: production nL = 3 density cuts",
     x = "raw beta",
     y = "calibrated beta",
     colour = NULL
@@ -697,73 +241,186 @@ p_map <- ggplot(map_df, aes(x = beta, y = calibrated, colour = method)) +
   theme_bw(base_size = 12) +
   theme(legend.position = "top", aspect.ratio = 1)
 
-if (requireNamespace("patchwork", quietly = TRUE)) {
-  p1 <- (p_before_gold | p_nL3_gold | p_nL2_gold) /
-    (p_before_nL3 | p_before_nL2 | p_nL3_nL2) /
-    (p_density | p_abs_hist) /
-    (p_map | p_before_nL3_noH)
-  print(p1)
-} else {
-  print(p_before_gold)
-  print(p_nL3_gold)
-  print(p_nL2_gold)
-  print(p_before_nL3)
-  print(p_before_nL2)
-  print(p_nL3_nL2)
-  print(p_density)
-  print(p_abs_hist)
-  print(p_map)
-  print(p_before_nL3_noH)
-  p1 <- list(
-    before_gold = p_before_gold,
-    nL3_gold = p_nL3_gold,
-    nL2_gold = p_nL2_gold,
-    before_nL3 = p_before_nL3,
-    before_nL2 = p_before_nL2,
-    nL3_nL2 = p_nL3_nL2,
-    density = p_density,
-    abs_hist = p_abs_hist,
-    map = p_map,
-    before_nL3_noH = p_before_nL3_noH
-  )
+print(p_density)
+print(p_map)
+
+# -----------------------------------------------------------------------------
+# Plotly: same series, click legend entries to toggle traces
+# -----------------------------------------------------------------------------
+kde_xy <- function(x, n = 512L) {
+  d <- stats::density(x, from = 0, to = 1, n = n)
+  data.frame(x = d$x, y = d$y)
 }
 
+dens_series <- c(
+  list(`gold (raw)` = gold_v),
+  sample_series
+)
+dens_linetypes <- c(
+  "gold (raw)" = "dash",
+  "before" = "solid",
+  "nL=2" = "solid",
+  "nL=3" = "solid",
+  "legacy" = "solid"
+)
+
+p_density_plotly <- plot_ly()
+for (nm in names(dens_series)) {
+  xy <- kde_xy(dens_series[[nm]])
+  p_density_plotly <- add_trace(
+    p_density_plotly,
+    x = xy$x,
+    y = xy$y,
+    type = "scatter",
+    mode = "lines",
+    name = nm,
+    line = list(
+      color = unname(type_cols[[nm]]),
+      width = if (nm == "gold (raw)") 2.5 else 1.8,
+      dash = unname(dens_linetypes[[nm]])
+    ),
+    hovertemplate = paste0(nm, "<br>beta: %{x:.3f}<br>density: %{y:.3f}<extra></extra>")
+  )
+}
+p_density_plotly <- layout(
+  p_density_plotly,
+  title = list(
+    text = paste0(
+      "Beta density (", sample_id, ", i=", sample_i, ")<br>",
+      "<sup>raw gold (empirical) vs sample before / calibrated — ",
+      "click legend to toggle</sup>"
+    )
+  ),
+  xaxis = list(title = "beta", range = c(0, 1)),
+  yaxis = list(title = "density"),
+  legend = list(orientation = "h", y = 1.08),
+  hovermode = "x unified"
+)
+
+p_map_plotly <- plot_ly()
+p_map_plotly <- add_trace(
+  p_map_plotly,
+  x = c(0, 1),
+  y = c(0, 1),
+  type = "scatter",
+  mode = "lines",
+  name = "y = x",
+  line = list(color = "grey70", dash = "dot", width = 1),
+  hoverinfo = "skip",
+  showlegend = TRUE
+)
+for (nm in levels(map_df$method)) {
+  sub <- map_df[map_df$method == nm, , drop = FALSE]
+  p_map_plotly <- add_trace(
+    p_map_plotly,
+    x = sub$beta,
+    y = sub$calibrated,
+    type = "scatter",
+    mode = "lines",
+    name = nm,
+    line = list(color = unname(map_cols[[nm]]), width = 1.8),
+    hovertemplate = paste0(
+      nm, "<br>raw: %{x:.3f}<br>calibrated: %{y:.3f}<extra></extra>"
+    )
+  )
+}
+if (length(nL3$thresholds)) {
+  for (i in seq_along(nL3$thresholds)) {
+    th <- nL3$thresholds[[i]]
+    p_map_plotly <- add_trace(
+      p_map_plotly,
+      x = c(th, th),
+      y = c(0, 1),
+      type = "scatter",
+      mode = "lines",
+      name = if (i == 1L) "nL=3 cuts" else paste0("nL=3 cut ", i),
+      line = list(color = "grey40", dash = "dash", width = 1),
+      hovertemplate = paste0("threshold: ", signif(th, 4), "<extra></extra>"),
+      showlegend = i == 1L,
+      legendgroup = "nL3_cuts"
+    )
+  }
+}
+p_map_plotly <- layout(
+  p_map_plotly,
+  title = list(
+    text = paste0(
+      "Calibrated map g(beta) (", sample_id, ", i=", sample_i, ")<br>",
+      "<sup>click legend to toggle</sup>"
+    )
+  ),
+  xaxis = list(title = "raw beta", range = c(0, 1), scaleanchor = "y"),
+  yaxis = list(title = "calibrated beta", range = c(0, 1)),
+  legend = list(orientation = "h", y = 1.08),
+  hovermode = "closest"
+)
+
+print(p_density_plotly)
+print(p_map_plotly)
+
+# -----------------------------------------------------------------------------
+# Save
+# -----------------------------------------------------------------------------
 out_dir <- file.path("dev", "tmp")
 if (!dir.exists(out_dir)) {
   dir.create(out_dir, recursive = TRUE)
 }
 
-saveRDS(
-  list(
-    bench = bm,
-    long = long,
-    wide = wide,
-    map = map_df,
-    geometry = list(
-      nL3 = geom_nL3,
-      nL3_noH = geom_nL3_noH,
-      nL2 = geom_nL2,
-      gold = new3_res$diagnostics$gold
-    ),
-    sample_id = sample_id,
-    n_zero = n_zero,
-    n_one = n_one
-  ),
-  file = file.path(out_dir, "benchmark-results.rds")
+res_nl2 <- bmiq_calibration(
+  datM = dat1,
+  goldstandard.beta = gold_v,
+  nL = 2,
+  nfit = nfit,
+  niter = niter,
+  tol = 0.001,
+  verbose = FALSE,
+  debug = TRUE
 )
+
+res_nl3 <- bmiq_calibration(
+  datM = dat1,
+  goldstandard.beta = gold_v,
+  nL = 3,
+  nfit = nfit,
+  niter = niter,
+  tol = 0.001,
+  verbose = FALSE,
+  debug = TRUE
+)
+
+# Drop huge index vectors so the dump stays readable.
+strip_random_indices <- function(diagnostics) {
+  if (!is.null(diagnostics$gold)) {
+    diagnostics$gold$random_indices <- NULL
+  }
+  if (length(diagnostics$samples) >= 1L &&
+    !is.null(diagnostics$samples[[1L]])) {
+    diagnostics$samples[[1L]]$random_indices <- NULL
+  }
+  diagnostics
+}
+
+diag_nl2 <- strip_random_indices(res_nl2$diagnostics)
+diag_nl3 <- strip_random_indices(res_nl3$diagnostics)
+
+sink_diagnostics <- function(diagnostics, path) {
+  sink(path)
+  on.exit(sink(), add = TRUE)
+  print(diagnostics)
+}
+
+sink_diagnostics(diag_nl2, file.path(out_dir, "benchmark-diagnostics-nl2.txt"))
+sink_diagnostics(diag_nl3, file.path(out_dir, "benchmark-diagnostics-nl3.txt"))
+message("Wrote: ", file.path(out_dir, "benchmark-diagnostics-nl2.txt"))
+message("Wrote: ", file.path(out_dir, "benchmark-diagnostics-nl3.txt"))
 
 ggsave(
-  filename = file.path(out_dir, "benchmark-scatters.png"),
-  plot = if (inherits(p1, "ggplot") || inherits(p1, "patchwork")) {
-    p1
-  } else {
-    p_density
-  },
-  width = 14,
-  height = 16,
+  filename = file.path(out_dir, "benchmark-density.png"),
+  plot = p_density,
+  width = 8,
+  height = 5,
   dpi = 120
 )
-
 ggsave(
   filename = file.path(out_dir, "benchmark-map.png"),
   plot = p_map,
@@ -772,7 +429,29 @@ ggsave(
   dpi = 120
 )
 
-message("\nSaved: ", file.path(out_dir, "benchmark-results.rds"))
-message("Saved: ", file.path(out_dir, "benchmark-scatters.png"))
+htmlwidgets::saveWidget(
+  p_density_plotly,
+  file = normalizePath(
+    file.path(out_dir, "benchmark-density.html"),
+    mustWork = FALSE
+  ),
+  selfcontained = TRUE,
+  title = paste0("Beta density — ", sample_id)
+)
+htmlwidgets::saveWidget(
+  p_map_plotly,
+  file = normalizePath(
+    file.path(out_dir, "benchmark-map.html"),
+    mustWork = FALSE
+  ),
+  selfcontained = TRUE,
+  title = paste0("Calibrated map — ", sample_id)
+)
+
+message("Saved: ", file.path(out_dir, "benchmark-density.png"))
 message("Saved: ", file.path(out_dir, "benchmark-map.png"))
+message("Saved: ", file.path(out_dir, "benchmark-density.html"))
+message("Saved: ", file.path(out_dir, "benchmark-map.html"))
 message("Done.")
+
+

@@ -14,14 +14,11 @@ GPL21145_sample
 }
 \description{
 Example DNA methylation beta matrix for probes in
-\link{horvath_goldstandard}, for use with \code{\link[=BMIQcalibration]{BMIQcalibration()}}.
+\link{horvath_goldstandard}, for use with \code{\link[=bmiq_calibration]{bmiq_calibration()}}.
 }
 \examples{
 data(GPL21145_sample)
 dim(GPL21145_sample)
 
-}
-\seealso{
-\code{\link[=BMIQcalibration]{BMIQcalibration()}}, \link{horvath_goldstandard}
 }
 \keyword{datasets}

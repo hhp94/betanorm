@@ -1,0 +1,22 @@
+#' Description of the CpGs used in MEAT
+#'
+#' Detailed information on the 200 CpGs automatically selected by the elastic
+#' net model.
+#' @format A data frame with 201 rows and 6 variables:
+#' \describe{
+#'   \item{CpG}{CpG name}
+#'   \item{Coefficient}{Weight given by the elastic net model to the CpG}
+#'   \item{Chromosome}{Chromosome where the CpG is located}
+#'   \item{Position}{Position in bp where the CpG is located (human genome
+#'   build version hg38)}
+#'   \item{Gene}{Gene annotated to the CpG. Each CpG was annotated to one or
+#'   more genes using the annotation file from
+#'   \href{https://academic.oup.com/nar/article/45/4/e22/2290930}{Zhou et al.}
+#'   to which we added annotation to long-range interaction promoters using
+#'   chromatin states in male skeletal muscle from the Roadmap Epigenomics
+#'   Project and GeneHancer information from the Genome Browser (hg38).}
+#'   \item{Chromatin_state_male_SM}{Chromatin state in male skeletal muscle
+#'   from the the Roadmap Epigenomics Project)}
+#'   }
+#' @source \url{https://onlinelibrary.wiley.com/doi/full/10.1002/jcsm.12556}
+"CpGs_in_MEAT"

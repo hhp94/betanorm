@@ -17,7 +17,7 @@ test_that("ordering helpers enforce strict vs anchor policies", {
 })
 
 test_that("gold-standard fits still require complete component ordering", {
-  inputs <- make_calibration_inputs(n_probes = 800L, nL = 3L, seed = 10L)
+  inputs <- make_calibration_inputs(n_probes = 800L, seed = 10L)
   real_pipeline <- fitMixturePipeline
 
   local_mocked_bindings(
@@ -51,9 +51,6 @@ test_that("gold-standard fits still require complete component ordering", {
         mean.order = mean.order
       )
       if (identical(context, "Gold-standard")) {
-        # Gold uses mean.order = "strict". Re-apply that gate to forced
-        # disordered means so the gold path aborts as production would
-        # when EM returns a non-monotone component mean vector.
         fit$component_means <- c(0.2, 0.9, 0.5)
         requireOrderedComponentMeans(
           fit$component_means,
@@ -66,10 +63,9 @@ test_that("gold-standard fits still require complete component ordering", {
   )
 
   expect_error(
-    BMIQcalibration(
+    bmiq_calibration(
       datM = inputs$datM,
       goldstandard.beta = inputs$gold,
-      nL = 3L,
       nfit = 800L,
       verbose = FALSE
     ),
@@ -78,7 +74,7 @@ test_that("gold-standard fits still require complete component ordering", {
 })
 
 test_that("optional H accepts separated U/M anchors despite disordered H", {
-  inputs <- make_calibration_inputs(n_probes = 1500L, nL = 3L, seed = 11L)
+  inputs <- make_calibration_inputs(n_probes = 1500L, seed = 11L)
   real_pipeline <- fitMixturePipeline
 
   local_mocked_bindings(
@@ -112,8 +108,6 @@ test_that("optional H accepts separated U/M anchors despite disordered H", {
         mean.order = mean.order
       )
       if (grepl("^Sample", context) && mean.order == "anchors" && nL == 3L) {
-        # Keep U < M so U/M quantile calibration remains valid, but put H
-        # out of order so the H block's strict ordering fails.
         fit$component_means <- c(0.15, 0.85, 0.70)
       }
       fit
@@ -121,10 +115,9 @@ test_that("optional H accepts separated U/M anchors despite disordered H", {
     .package = "bmiqpp"
   )
 
-  result <- suppressWarnings(BMIQcalibration(
+  result <- suppressWarnings(bmiq_calibration(
     datM = inputs$datM,
     goldstandard.beta = inputs$gold,
-    nL = 3L,
     doH = TRUE,
     h.policy = "optional",
     nfit = 1500L,
@@ -138,7 +131,7 @@ test_that("optional H accepts separated U/M anchors despite disordered H", {
 })
 
 test_that("required H fails for the same disordered fit", {
-  inputs <- make_calibration_inputs(n_probes = 1500L, nL = 3L, seed = 11L)
+  inputs <- make_calibration_inputs(n_probes = 1500L, seed = 11L)
   real_pipeline <- fitMixturePipeline
 
   local_mocked_bindings(
@@ -180,10 +173,9 @@ test_that("required H fails for the same disordered fit", {
   )
 
   expect_error(
-    BMIQcalibration(
+    bmiq_calibration(
       datM = inputs$datM,
       goldstandard.beta = inputs$gold,
-      nL = 3L,
       doH = TRUE,
       h.policy = "require",
       on.sample.error = "stop",

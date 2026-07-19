@@ -1,0 +1,44 @@
+Package: MEAT
+Title: Muscle Epigenetic Age Test
+Version: 1.24.0
+Authors@R: c(
+    person(given = "Sarah",
+           family = "Voisin",
+           role = c("aut", "cre"),
+           email = "sarah.voisin.aeris@gmail.com",
+           comment = c(ORCID = "0000-0002-4074-7083")),
+    person(given = "Steve",
+           family = "Horvath",
+           role = c("ctb"),
+           email = "SHorvath@mednet.ucla.edu",
+           comment = c(ORCID = "0000-0002-4110-3589"))
+    )
+Description: This package estimates epigenetic age in skeletal muscle,
+    using DNA methylation data generated with the
+    Illumina Infinium technology (HM27, HM450 and HMEPIC).
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Depends: R (>= 4.0)
+Imports: impute (>= 1.58), dynamicTreeCut (>= 1.63), glmnet (>= 2.0),
+        grDevices, graphics, stats, utils, stringr, tibble, RPMM (>=
+        1.25), minfi (>= 1.30), dplyr, SummarizedExperiment, wateRmelon
+VignetteBuilder: knitr
+Suggests: knitr, markdown, rmarkdown, BiocStyle, testthat (>= 2.1.0)
+biocViews: Epigenetics, DNAMethylation, Microarray, Normalization,
+        BiomedicalInformatics, MethylationArray, Preprocessing
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.1.1
+URL: https://github.com/sarah-voisin/MEAT
+BugReports: https://github.com/sarah-voisin/MEAT/issues
+NeedsCompilation: no
+Packaged: 2026-04-28 23:06:13 UTC; biocbuild
+Author: Sarah Voisin [aut, cre] (<https://orcid.org/0000-0002-4074-7083>),
+  Steve Horvath [ctb] (<https://orcid.org/0000-0002-4110-3589>)
+Maintainer: Sarah Voisin <sarah.voisin.aeris@gmail.com>
+git_url: https://git.bioconductor.org/packages/MEAT
+git_branch: RELEASE_3_23
+git_last_commit: ad9f5a7
+git_last_commit_date: 2026-04-28
+Repository: Bioconductor 3.23
+Date/Publication: 2026-04-28

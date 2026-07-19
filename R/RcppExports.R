@@ -5,27 +5,11 @@ scan_finite_unit_interval_cpp <- function(x, name = "x", require_open = FALSE) {
     invisible(.Call(`_bmiqpp_scan_finite_unit_interval_cpp`, x, name, require_open))
 }
 
-beta_est_newton_cpp <- function(y, responsibility, observation_weight, maxit = 50L, max_halving = 30L, score_tol = 1e-10, min_shape = 1e-10, armijo = 1e-4) {
-    .Call(`_bmiqpp_beta_est_newton_cpp`, y, responsibility, observation_weight, maxit, max_halving, score_tol, min_shape, armijo)
+beta_mixture_em_cpp <- function(y, initial_responsibility, nL = 3L, maxiter = 25L, tol = 1e-6, beta_maxit = 50L, beta_max_halving = 30L, beta_score_tol = 1e-10, min_shape = 1e-10, armijo = 1e-4, debug = FALSE) {
+    .Call(`_bmiqpp_beta_mixture_em_cpp`, y, initial_responsibility, nL, maxiter, tol, beta_maxit, beta_max_halving, beta_score_tol, min_shape, armijo, debug)
 }
 
-beta_mixture_em_cpp <- function(y, initial_responsibility, nL = 3L, weights = NULL, maxiter = 25L, tol = 1e-6, beta_maxit = 50L, beta_max_halving = 30L, beta_score_tol = 1e-10, min_shape = 1e-10, armijo = 1e-4, debug = FALSE) {
-    .Call(`_bmiqpp_beta_mixture_em_cpp`, y, initial_responsibility, nL, weights, maxiter, tol, beta_maxit, beta_max_halving, beta_score_tol, min_shape, armijo, debug)
-}
-
-boost_digamma_cpp <- function(x) {
-    .Call(`_bmiqpp_boost_digamma_cpp`, x)
-}
-
-boost_trigamma_cpp <- function(x) {
-    .Call(`_bmiqpp_boost_trigamma_cpp`, x)
-}
-
-boost_pbeta_cpp <- function(q, shape1, shape2, lower_tail = TRUE) {
-    .Call(`_bmiqpp_boost_pbeta_cpp`, q, shape1, shape2, lower_tail)
-}
-
-boost_qbeta_cpp <- function(p, shape1, shape2, lower_tail = TRUE) {
-    .Call(`_bmiqpp_boost_qbeta_cpp`, p, shape1, shape2, lower_tail)
+qnorm_target_rows_cpp <- function(obj, target) {
+    .Call(`_bmiqpp_qnorm_target_rows_cpp`, obj, target)
 }
 

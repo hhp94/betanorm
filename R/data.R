@@ -14,11 +14,15 @@
 #'   \item{`goldstandard2`}{Gold-standard mean beta value.}
 #' }
 #'
-#' @seealso [BMIQcalibration()], [GPL21145_sample]
-#'
 #' @examples
 #' data(horvath_goldstandard)
 #' head(horvath_goldstandard)
+#'
+#' @references
+#' Horvath S (2013).
+#' DNA methylation age of human tissues and cell types.
+#' *Genome Biology* 14(10), R115.
+#' \doi{10.1186/gb-2013-14-10-r115}
 #'
 #' @keywords datasets
 "horvath_goldstandard"
@@ -27,13 +31,11 @@
 #' Example Methylation Beta Matrix (GPL21145)
 #'
 #' Example DNA methylation beta matrix for probes in
-#' [horvath_goldstandard], for use with [BMIQcalibration()].
+#' [horvath_goldstandard], for use with [bmiq_calibration()].
 #'
 #' @format A numeric matrix with 6 samples (rows) and 21368 CpGs (columns).
 #'   Column names match `horvath_goldstandard$Name`. Values are in
 #'   \eqn{[0, 1]}.
-#'
-#' @seealso [BMIQcalibration()], [horvath_goldstandard]
 #'
 #' @examples
 #' data(GPL21145_sample)

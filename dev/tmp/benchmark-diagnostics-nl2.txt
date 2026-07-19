@@ -1,0 +1,170 @@
+$gold
+$gold$initial_class_counts
+[1] 14961  5039
+
+$gold$eta
+          [,1]
+[1,] 0.7034938
+[2,] 0.2965062
+
+$gold$component_means
+[1] 0.06826653 0.72471793
+
+$gold$component_a
+[1] 1.734405 3.994704
+
+$gold$component_b
+[1] 23.671971  1.517377
+
+$gold$component_fit_status
+[1] "converged" "converged"
+
+$gold$component_fit_reason
+[1] "score tolerance reached" "score tolerance reached"
+
+$gold$em_iterations
+[1] 5
+
+$gold$em_converged
+[1] FALSE
+
+$gold$parameter_criterion
+[1] 0.1263716
+
+$gold$loglik_criterion
+[1] 0.007722533
+
+$gold$log_likelihood
+[1] 15959.87
+
+$gold$subset_map_counts
+[1] 13992  6008
+
+$gold$thresholds
+[1] 0.2736596
+
+$gold$complete_class_counts
+[1] 14974  6394
+
+$gold$parameter_criterion_trace
+[1]       Inf 0.2623212 0.1961623 0.1564111 0.1263716
+
+$gold$loglik_criterion_trace
+[1]         Inf 0.037528666 0.022714619 0.013035363 0.007722533
+
+$gold$unmethylated_mode
+[1] 0.02990706
+
+$gold$methylated_mode
+[1] 0.8740641
+
+
+$samples
+$samples[[1]]
+$samples[[1]]$sample_index
+[1] 1
+
+$samples[[1]]$sample_name
+[1] "CLHNS_6_EPICv1"
+
+$samples[[1]]$input_range
+[1] 0.000000 0.987739
+
+$samples[[1]]$low_mode_window_count
+[1] 15718
+
+$samples[[1]]$high_mode_window_count
+[1] 4589
+
+$samples[[1]]$unmethylated_mode
+[1] 0.03822939
+
+$samples[[1]]$methylated_mode
+[1] 0.8993623
+
+$samples[[1]]$unmethylated_shift
+[1] 0.008322332
+
+$samples[[1]]$methylated_shift
+[1] 0.02529824
+
+$samples[[1]]$initial_thresholds
+[1] 0.2904699
+
+$samples[[1]]$initial_class_counts
+[1] 14000  6000
+
+$samples[[1]]$eta
+          [,1]
+[1,] 0.6978586
+[2,] 0.3021414
+
+$samples[[1]]$component_means
+[1] 0.06730211 0.69705872
+
+$samples[[1]]$component_a
+[1] 1.128649 3.448552
+
+$samples[[1]]$component_b
+[1] 15.641236  1.498739
+
+$samples[[1]]$component_fit_status
+[1] "converged" "converged"
+
+$samples[[1]]$component_fit_reason
+[1] "score tolerance reached" "score tolerance reached"
+
+$samples[[1]]$em_iterations
+[1] 5
+
+$samples[[1]]$em_converged
+[1] FALSE
+
+$samples[[1]]$parameter_criterion
+[1] 0.005715269
+
+$samples[[1]]$loglik_criterion
+[1] 1.389764e-05
+
+$samples[[1]]$log_likelihood
+[1] 14608.53
+
+$samples[[1]]$subset_map_counts
+[1] 13989  6011
+
+$samples[[1]]$thresholds
+[1] 0.2885583
+
+$samples[[1]]$complete_class_counts
+[1] 14979  6389
+
+$samples[[1]]$parameter_criterion_trace
+[1]         Inf 0.067381739 0.015557027 0.007670311 0.005715269
+
+$samples[[1]]$loglik_criterion_trace
+[1]          Inf 9.266334e-04 4.217444e-05 1.952730e-05 1.389764e-05
+
+$samples[[1]]$posterior_thresholds
+[1] 0.2885583
+
+$samples[[1]]$nl2_sample_threshold
+[1] 0.2885583
+
+$samples[[1]]$nl2_gold_threshold
+[1] 0.2736596
+
+$samples[[1]]$tail_counts
+ U_left U_right  M_left M_right 
+  10219    4760    2455    3934 
+
+$samples[[1]]$output_range
+[1] 0.0000000 0.9887049
+
+$samples[[1]]$h_applied
+[1] NA
+
+$samples[[1]]$success
+[1] TRUE
+
+
+

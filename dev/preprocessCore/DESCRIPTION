@@ -1,0 +1,22 @@
+Package: preprocessCore
+Version: 1.74.0
+Title: A collection of pre-processing functions
+Author: Ben Bolstad <bmb@bmbolstad.com>
+Maintainer: Ben Bolstad <bmb@bmbolstad.com>
+Imports: stats
+Description: A library of core preprocessing routines. 
+License: LGPL (>= 2)
+URL: https://github.com/bmbolstad/preprocessCore
+Collate: normalize.quantiles.R quantile_extensions.R
+        rma.background.correct.R rcModel.R colSummarize.R
+        subColSummarize.R plmr.R plmd.R
+LazyLoad: yes
+biocViews: Infrastructure
+git_url: https://git.bioconductor.org/packages/preprocessCore
+git_branch: RELEASE_3_23
+git_last_commit: d5de515
+git_last_commit_date: 2026-04-28
+Repository: Bioconductor 3.23
+Date/Publication: 2026-04-28
+NeedsCompilation: yes
+Packaged: 2026-04-28 23:56:33 UTC; biocbuild

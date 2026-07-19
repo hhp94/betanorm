@@ -2,7 +2,6 @@
 // Generator token: 10BE3573-1514-4C36-9D1C-5A225CD40393
 
 #include <RcppArmadillo.h>
-#include <RcppThread.h>
 #include <Rcpp.h>
 
 using namespace Rcpp;
@@ -24,34 +23,15 @@ BEGIN_RCPP
     return R_NilValue;
 END_RCPP
 }
-// beta_est_newton_cpp
-Rcpp::List beta_est_newton_cpp(const arma::vec& y, const arma::vec& responsibility, const arma::vec& observation_weight, int maxit, int max_halving, double score_tol, double min_shape, double armijo);
-RcppExport SEXP _bmiqpp_beta_est_newton_cpp(SEXP ySEXP, SEXP responsibilitySEXP, SEXP observation_weightSEXP, SEXP maxitSEXP, SEXP max_halvingSEXP, SEXP score_tolSEXP, SEXP min_shapeSEXP, SEXP armijoSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< const arma::vec& >::type y(ySEXP);
-    Rcpp::traits::input_parameter< const arma::vec& >::type responsibility(responsibilitySEXP);
-    Rcpp::traits::input_parameter< const arma::vec& >::type observation_weight(observation_weightSEXP);
-    Rcpp::traits::input_parameter< int >::type maxit(maxitSEXP);
-    Rcpp::traits::input_parameter< int >::type max_halving(max_halvingSEXP);
-    Rcpp::traits::input_parameter< double >::type score_tol(score_tolSEXP);
-    Rcpp::traits::input_parameter< double >::type min_shape(min_shapeSEXP);
-    Rcpp::traits::input_parameter< double >::type armijo(armijoSEXP);
-    rcpp_result_gen = Rcpp::wrap(beta_est_newton_cpp(y, responsibility, observation_weight, maxit, max_halving, score_tol, min_shape, armijo));
-    return rcpp_result_gen;
-END_RCPP
-}
 // beta_mixture_em_cpp
-Rcpp::List beta_mixture_em_cpp(const arma::vec& y, const arma::mat& initial_responsibility, int nL, Rcpp::Nullable<Rcpp::NumericVector> weights, int maxiter, double tol, int beta_maxit, int beta_max_halving, double beta_score_tol, double min_shape, double armijo, bool debug);
-RcppExport SEXP _bmiqpp_beta_mixture_em_cpp(SEXP ySEXP, SEXP initial_responsibilitySEXP, SEXP nLSEXP, SEXP weightsSEXP, SEXP maxiterSEXP, SEXP tolSEXP, SEXP beta_maxitSEXP, SEXP beta_max_halvingSEXP, SEXP beta_score_tolSEXP, SEXP min_shapeSEXP, SEXP armijoSEXP, SEXP debugSEXP) {
+Rcpp::List beta_mixture_em_cpp(const arma::vec& y, const arma::mat& initial_responsibility, int nL, int maxiter, double tol, int beta_maxit, int beta_max_halving, double beta_score_tol, double min_shape, double armijo, bool debug);
+RcppExport SEXP _bmiqpp_beta_mixture_em_cpp(SEXP ySEXP, SEXP initial_responsibilitySEXP, SEXP nLSEXP, SEXP maxiterSEXP, SEXP tolSEXP, SEXP beta_maxitSEXP, SEXP beta_max_halvingSEXP, SEXP beta_score_tolSEXP, SEXP min_shapeSEXP, SEXP armijoSEXP, SEXP debugSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const arma::vec& >::type y(ySEXP);
     Rcpp::traits::input_parameter< const arma::mat& >::type initial_responsibility(initial_responsibilitySEXP);
     Rcpp::traits::input_parameter< int >::type nL(nLSEXP);
-    Rcpp::traits::input_parameter< Rcpp::Nullable<Rcpp::NumericVector> >::type weights(weightsSEXP);
     Rcpp::traits::input_parameter< int >::type maxiter(maxiterSEXP);
     Rcpp::traits::input_parameter< double >::type tol(tolSEXP);
     Rcpp::traits::input_parameter< int >::type beta_maxit(beta_maxitSEXP);
@@ -60,69 +40,27 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< double >::type min_shape(min_shapeSEXP);
     Rcpp::traits::input_parameter< double >::type armijo(armijoSEXP);
     Rcpp::traits::input_parameter< bool >::type debug(debugSEXP);
-    rcpp_result_gen = Rcpp::wrap(beta_mixture_em_cpp(y, initial_responsibility, nL, weights, maxiter, tol, beta_maxit, beta_max_halving, beta_score_tol, min_shape, armijo, debug));
+    rcpp_result_gen = Rcpp::wrap(beta_mixture_em_cpp(y, initial_responsibility, nL, maxiter, tol, beta_maxit, beta_max_halving, beta_score_tol, min_shape, armijo, debug));
     return rcpp_result_gen;
 END_RCPP
 }
-// boost_digamma_cpp
-Rcpp::NumericVector boost_digamma_cpp(Rcpp::NumericVector x);
-RcppExport SEXP _bmiqpp_boost_digamma_cpp(SEXP xSEXP) {
+// qnorm_target_rows_cpp
+Rcpp::NumericMatrix qnorm_target_rows_cpp(const Rcpp::NumericMatrix& obj, const Rcpp::NumericVector& target);
+RcppExport SEXP _bmiqpp_qnorm_target_rows_cpp(SEXP objSEXP, SEXP targetSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
-    rcpp_result_gen = Rcpp::wrap(boost_digamma_cpp(x));
-    return rcpp_result_gen;
-END_RCPP
-}
-// boost_trigamma_cpp
-Rcpp::NumericVector boost_trigamma_cpp(Rcpp::NumericVector x);
-RcppExport SEXP _bmiqpp_boost_trigamma_cpp(SEXP xSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
-    rcpp_result_gen = Rcpp::wrap(boost_trigamma_cpp(x));
-    return rcpp_result_gen;
-END_RCPP
-}
-// boost_pbeta_cpp
-Rcpp::NumericVector boost_pbeta_cpp(Rcpp::NumericVector q, double shape1, double shape2, bool lower_tail);
-RcppExport SEXP _bmiqpp_boost_pbeta_cpp(SEXP qSEXP, SEXP shape1SEXP, SEXP shape2SEXP, SEXP lower_tailSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type q(qSEXP);
-    Rcpp::traits::input_parameter< double >::type shape1(shape1SEXP);
-    Rcpp::traits::input_parameter< double >::type shape2(shape2SEXP);
-    Rcpp::traits::input_parameter< bool >::type lower_tail(lower_tailSEXP);
-    rcpp_result_gen = Rcpp::wrap(boost_pbeta_cpp(q, shape1, shape2, lower_tail));
-    return rcpp_result_gen;
-END_RCPP
-}
-// boost_qbeta_cpp
-Rcpp::NumericVector boost_qbeta_cpp(Rcpp::NumericVector p, double shape1, double shape2, bool lower_tail);
-RcppExport SEXP _bmiqpp_boost_qbeta_cpp(SEXP pSEXP, SEXP shape1SEXP, SEXP shape2SEXP, SEXP lower_tailSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type p(pSEXP);
-    Rcpp::traits::input_parameter< double >::type shape1(shape1SEXP);
-    Rcpp::traits::input_parameter< double >::type shape2(shape2SEXP);
-    Rcpp::traits::input_parameter< bool >::type lower_tail(lower_tailSEXP);
-    rcpp_result_gen = Rcpp::wrap(boost_qbeta_cpp(p, shape1, shape2, lower_tail));
+    Rcpp::traits::input_parameter< const Rcpp::NumericMatrix& >::type obj(objSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type target(targetSEXP);
+    rcpp_result_gen = Rcpp::wrap(qnorm_target_rows_cpp(obj, target));
     return rcpp_result_gen;
 END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
     {"_bmiqpp_scan_finite_unit_interval_cpp", (DL_FUNC) &_bmiqpp_scan_finite_unit_interval_cpp, 3},
-    {"_bmiqpp_beta_est_newton_cpp", (DL_FUNC) &_bmiqpp_beta_est_newton_cpp, 8},
-    {"_bmiqpp_beta_mixture_em_cpp", (DL_FUNC) &_bmiqpp_beta_mixture_em_cpp, 12},
-    {"_bmiqpp_boost_digamma_cpp", (DL_FUNC) &_bmiqpp_boost_digamma_cpp, 1},
-    {"_bmiqpp_boost_trigamma_cpp", (DL_FUNC) &_bmiqpp_boost_trigamma_cpp, 1},
-    {"_bmiqpp_boost_pbeta_cpp", (DL_FUNC) &_bmiqpp_boost_pbeta_cpp, 4},
-    {"_bmiqpp_boost_qbeta_cpp", (DL_FUNC) &_bmiqpp_boost_qbeta_cpp, 4},
+    {"_bmiqpp_beta_mixture_em_cpp", (DL_FUNC) &_bmiqpp_beta_mixture_em_cpp, 11},
+    {"_bmiqpp_qnorm_target_rows_cpp", (DL_FUNC) &_bmiqpp_qnorm_target_rows_cpp, 2},
     {NULL, NULL, 0}
 };
 

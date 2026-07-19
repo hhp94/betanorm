@@ -28,7 +28,10 @@ data(horvath_goldstandard)
 head(horvath_goldstandard)
 
 }
-\seealso{
-\code{\link[=BMIQcalibration]{BMIQcalibration()}}, \link{GPL21145_sample}
+\references{
+Horvath S (2013).
+DNA methylation age of human tissues and cell types.
+\emph{Genome Biology} 14(10), R115.
+\doi{10.1186/gb-2013-14-10-r115}
 }
 \keyword{datasets}

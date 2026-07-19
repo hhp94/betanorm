@@ -29,7 +29,7 @@ simulate_beta_mixture <- function(
 }
 
 #' Hard one-hot responsibilities from ordered thresholds.
-hard_responsibility <- function(y, thresholds, nL) {
+hard_responsibility <- function(y, thresholds, nL = 3L) {
   class <- rep.int(1L, length(y))
   for (boundary in seq_along(thresholds)) {
     class[y > thresholds[boundary]] <- boundary + 1L
@@ -39,7 +39,7 @@ hard_responsibility <- function(y, thresholds, nL) {
   w
 }
 
-#' Build a one-row datM matrix and matching gold vector for BMIQcalibration.
+#' Build a one-row datM matrix and matching gold vector for bmiq_calibration.
 make_calibration_inputs <- function(
   n_probes = 1500L,
   nL = 3L,
@@ -48,7 +48,6 @@ make_calibration_inputs <- function(
   gold <- simulate_beta_mixture(n_probes, nL = nL, seed = seed)
   # Mild sample shift so calibration has something to do.
   sample <- simulate_beta_mixture(n_probes, nL = nL, seed = seed + 7L)
-  # Slight rightward shift of the sample U mode relative to gold.
   sample <- clip01(sample + 0.02)
 
   datM <- matrix(sample, nrow = 1L, dimnames = list("s1", NULL))

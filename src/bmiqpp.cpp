@@ -11,13 +11,6 @@
 namespace
 {
 
-    // -----------------------------------------------------------------------------
-    // Weighted sufficient statistics for a Beta distribution.
-    //
-    // The weighted mean and variance accumulator is numerically more stable than
-    // calculating E[Y^2] - E[Y]^2. During EM, statistics for all nL components are
-    // collected in one pass through the observations.
-    // -----------------------------------------------------------------------------
     struct BetaStats
     {
         double weight = 0.0;
@@ -52,9 +45,6 @@ namespace
         }
     };
 
-    // -----------------------------------------------------------------------------
-    // Internal result from the Beta shape optimizer.
-    // -----------------------------------------------------------------------------
     struct BetaFit
     {
         double a = 1.0;
@@ -67,9 +57,6 @@ namespace
         std::string reason = "unknown failure";
     };
 
-    // -----------------------------------------------------------------------------
-    // Weighted Beta log-likelihood based on sufficient statistics.
-    // -----------------------------------------------------------------------------
     inline double beta_loglik_stats(
         double a,
         double b,
@@ -83,22 +70,6 @@ namespace
                     std::lgamma(b));
     }
 
-    // -----------------------------------------------------------------------------
-    // Newton optimization with step halving.
-    //
-    // Intentional divergence from legacy R:
-    //
-    //   * Legacy blc() used BFGS.
-    //   * Legacy blc2() used Nelder-Mead.
-    //   * This implementation uses the same Newton optimizer for both.
-    //
-    // A finite estimate at which Newton stalls, or reaches maxit, remains usable.
-    // This is not a silent Beta(1,1) fallback: the best finite estimate found is
-    // retained and its status is returned. R can apply a stricter policy by
-    // requiring complete optimizer and EM convergence.
-    //
-    // Empty components / zero variance are hard failures (no finite Beta MLE).
-    // -----------------------------------------------------------------------------
     inline void set_beta_fit(
         BetaFit &out,
         double a,
@@ -118,27 +89,6 @@ namespace
         out.converged = converged;
         out.status = status;
         out.reason = reason;
-    }
-
-    inline void require_optimizer_settings(
-        int maxit,
-        int max_halving,
-        double score_tol,
-        double min_shape,
-        double armijo)
-    {
-        if (maxit < 1 || max_halving < 0)
-        {
-            Rcpp::stop(
-                "maxit must be positive and max_halving non-negative");
-        }
-        if (!(score_tol > 0.0) ||
-            !(min_shape > 0.0) ||
-            !(armijo > 0.0 && armijo < 1.0))
-        {
-            Rcpp::stop(
-                "Invalid score_tol, min_shape, or armijo setting");
-        }
     }
 
     BetaFit fit_beta_from_stats(
@@ -195,19 +145,20 @@ namespace
             return out;
         }
 
+        // Sufficient statistics are fixed for this MLE; only digamma/trigamma
+        // of the shapes change across Newton steps.
+        const double mean_log_y = stats.sum_log_y / stats.weight;
+        const double mean_log1m_y = stats.sum_log1m_y / stats.weight;
+
         for (int iter = 0; iter < maxit; ++iter)
         {
             const double ab = a + b;
             const double digamma_ab = R::digamma(ab);
 
             const double score_a =
-                stats.sum_log_y / stats.weight -
-                R::digamma(a) +
-                digamma_ab;
+                mean_log_y - R::digamma(a) + digamma_ab;
             const double score_b =
-                stats.sum_log1m_y / stats.weight -
-                R::digamma(b) +
-                digamma_ab;
+                mean_log1m_y - R::digamma(b) + digamma_ab;
 
             const double scaled_score =
                 std::max(std::abs(a * score_a), std::abs(b * score_b));
@@ -299,70 +250,6 @@ namespace
         return out;
     }
 
-    Rcpp::List beta_fit_to_list(const BetaFit &fit)
-    {
-        return Rcpp::List::create(
-            Rcpp::_["par"] =
-                Rcpp::NumericVector::create(fit.a, fit.b),
-            Rcpp::_["status"] = fit.status,
-            Rcpp::_["iterations"] = fit.iterations,
-            Rcpp::_["logLik"] = fit.loglik,
-            Rcpp::_["reason"] = fit.reason,
-            Rcpp::_["usable"] = fit.usable,
-            Rcpp::_["converged"] = fit.converged);
-    }
-
-} // anonymous namespace
-
-// -----------------------------------------------------------------------------
-// Bulk domain scanner used from R at the API boundary (datM / goldstandard).
-//
-// require_open = false: raw values in [0, 1].
-// require_open = true:  strictly inside (0, 1) (e.g. standalone Newton tests).
-//
-// Does not check mixture class occupancy or normalization anchors.
-// beta_mixture_em_cpp does not re-scan; it trusts R-side entry checks and
-// adaptive blc-style clipping (clipBetaForFit) for open-interval Beta work.
-// -----------------------------------------------------------------------------
-namespace
-{
-
-    inline void scan_finite_unit_interval(
-        const double *data,
-        arma::uword n,
-        const std::string &name,
-        bool require_open)
-    {
-        for (arma::uword i = 0; i < n; ++i)
-        {
-            const double value = data[i];
-
-            if (!std::isfinite(value))
-            {
-                Rcpp::stop(
-                    name +
-                    " must contain only finite values "
-                    "(no NA, NaN, or +/-Inf).");
-            }
-
-            if (require_open)
-            {
-                if (!(value > 0.0 && value < 1.0))
-                {
-                    Rcpp::stop(
-                        name +
-                        " must lie strictly inside (0, 1).");
-                }
-            }
-            else if (value < 0.0 || value > 1.0)
-            {
-                Rcpp::stop(
-                    name +
-                    " must have all values in [0, 1].");
-            }
-        }
-    }
-
 } // anonymous namespace
 
 // [[Rcpp::export]]
@@ -371,94 +258,44 @@ void scan_finite_unit_interval_cpp(
     std::string name = "x",
     bool require_open = false)
 {
-    scan_finite_unit_interval(x.memptr(), x.n_elem, name, require_open);
-}
+    const double *data = x.memptr();
+    const arma::uword n = x.n_elem;
 
-// -----------------------------------------------------------------------------
-// Standalone Beta optimizer for testing / diagnostics (not on the BMIQ path).
-// Keeps a light self-contained contract so unit tests can call it without
-// going through BMIQcalibration.
-// -----------------------------------------------------------------------------
-// [[Rcpp::export]]
-Rcpp::List beta_est_newton_cpp(
-    const arma::vec &y,
-    const arma::vec &responsibility,
-    const arma::vec &observation_weight,
-    int maxit = 50,
-    int max_halving = 30,
-    double score_tol = 1e-10,
-    double min_shape = 1e-10,
-    double armijo = 1e-4)
-{
-    const arma::uword n = y.n_elem;
-
-    if (responsibility.n_elem != n || observation_weight.n_elem != n)
-    {
-        Rcpp::stop(
-            "y, responsibility, and observation_weight "
-            "must have equal lengths");
-    }
-
-    require_optimizer_settings(
-        maxit, max_halving, score_tol, min_shape, armijo);
-    scan_finite_unit_interval(y.memptr(), n, "y", true);
-
-    BetaStats stats;
     for (arma::uword i = 0; i < n; ++i)
     {
-        const double yi = y[i];
-        stats.add(
-            yi,
-            std::log(yi),
-            std::log1p(-yi),
-            responsibility[i] * observation_weight[i]);
-    }
+        const double value = data[i];
 
-    return beta_fit_to_list(
-        fit_beta_from_stats(
-            stats,
-            maxit,
-            max_halving,
-            score_tol,
-            min_shape,
-            armijo));
+        if (!std::isfinite(value))
+        {
+            Rcpp::stop(
+                name +
+                " must contain only finite values "
+                "(no NA, NaN, or +/-Inf).");
+        }
+
+        if (require_open)
+        {
+            if (!(value > 0.0 && value < 1.0))
+            {
+                Rcpp::stop(
+                    name +
+                    " must lie strictly inside (0, 1).");
+            }
+        }
+        else if (value < 0.0 || value > 1.0)
+        {
+            Rcpp::stop(
+                name +
+                " must have all values in [0, 1].");
+        }
+    }
 }
 
-// -----------------------------------------------------------------------------
-// Complete Beta-mixture EM.
-//
-// Trust-R contract (BMIQcalibration / fitBetaMixture is the only entry):
-//
-//   * Hyperparameters already validated in R (nL, maxiter, tol, beta_*, …).
-//   * y already clipped into (0, 1) by clipBetaForFit when needed.
-//   * initial_responsibility is hard one-hot, n x nL, nonempty classes.
-//   * weights is unused on the BMIQ path (defaults to ones).
-//
-// This function does not re-validate API inputs. It only runs the algorithm
-// and hard-fails on numerical EM / Beta-optimizer pathologies:
-// zero component weight, unusable Beta MLE, non-finite E-step, etc.
-//
-// Intentional divergences from legacy blc()/blc2():
-//   * Newton for all components; no silent Beta(1,1) fallback.
-//   * Log-sum-exp E-step; one-pass sufficient statistics.
-//   * Finite stalled / max-iter Beta estimates returned with status.
-//
-// Outer EM convergence uses a dual criterion on the full parameter state
-// (log(a), log(b), eta) and relative log-likelihood change. Mean-only
-// stopping is intentionally not used: concentrations and mixture weights
-// can still move while component means are nearly fixed. Convergence is
-// declared only after at least two completed iterations when both
-// criteria fall below tol. No likelihood-monotonicity failure guard.
-//
-// Always returns parameter_criterion, loglik_criterion, converged, and
-// iterations. Debug mode additionally returns per-iteration traces.
-// -----------------------------------------------------------------------------
 // [[Rcpp::export]]
 Rcpp::List beta_mixture_em_cpp(
     const arma::vec &y,
     const arma::mat &initial_responsibility,
     int nL = 3,
-    Rcpp::Nullable<Rcpp::NumericVector> weights = R_NilValue,
     int maxiter = 25,
     double tol = 1e-6,
     int beta_maxit = 50,
@@ -468,10 +305,23 @@ Rcpp::List beta_mixture_em_cpp(
     double armijo = 1e-4,
     bool debug = false)
 {
-    const arma::uword n = y.n_elem;
+    if (nL < 2 || nL > 3)
+    {
+        Rcpp::stop("nL must be 2 or 3");
+    }
+
     const arma::uword K = static_cast<arma::uword>(nL);
-    // Parameter state: log(a_k), log(b_k), eta_k for each component.
+    const arma::uword n = y.n_elem;
     const arma::uword n_param = 3 * K;
+    const double n_obs = static_cast<double>(n);
+
+    if (initial_responsibility.n_rows != n ||
+        initial_responsibility.n_cols != K)
+    {
+        Rcpp::stop(
+            "initial_responsibility must be n x nL "
+            "(n = length(y))");
+    }
 
     arma::vec log_y(n);
     arma::vec log1m_y(n);
@@ -481,15 +331,6 @@ Rcpp::List beta_mixture_em_cpp(
         log1m_y[i] = std::log1p(-y[i]);
     }
 
-    arma::vec observation_weight(n, arma::fill::ones);
-    if (weights.isNotNull())
-    {
-        observation_weight = Rcpp::as<arma::vec>(weights.get());
-    }
-    const double total_observation_weight =
-        arma::accu(observation_weight);
-
-    // Trusted one-hot (or already row-normalized) responsibilities from R.
     arma::mat responsibility = initial_responsibility;
 
     arma::vec a(K, arma::fill::ones);
@@ -523,38 +364,26 @@ Rcpp::List beta_mixture_em_cpp(
     {
         Rcpp::checkUserInterrupt();
 
-        eta.zeros();
-
-        for (arma::uword i = 0; i < n; ++i)
-        {
-            const double wi = observation_weight[i];
-
-            for (arma::uword k = 0; k < K; ++k)
-            {
-                eta[k] += wi * responsibility(i, k);
-            }
-        }
-
-        eta /= total_observation_weight;
-
+        // One pass: component weights (eta) and Beta sufficient stats.
+        // stats[k].weight == sum_i responsibility(i, k).
         std::vector<BetaStats> stats(K);
 
         for (arma::uword i = 0; i < n; ++i)
         {
-            const double wi = observation_weight[i];
-
             for (arma::uword k = 0; k < K; ++k)
             {
                 stats[k].add(
                     y[i],
                     log_y[i],
                     log1m_y[i],
-                    wi * responsibility(i, k));
+                    responsibility(i, k));
             }
         }
 
         for (arma::uword k = 0; k < K; ++k)
         {
+            eta[k] = stats[k].weight / n_obs;
+
             if (!(eta[k] > 0.0) ||
                 !std::isfinite(eta[k]))
             {
@@ -594,6 +423,17 @@ Rcpp::List beta_mixture_em_cpp(
                 std::lgamma(b[k]);
         }
 
+        // E-step terms independent of observation index i.
+        arma::vec log_prior(K);
+        arma::vec am1(K);
+        arma::vec bm1(K);
+        for (arma::uword k = 0; k < K; ++k)
+        {
+            log_prior[k] = std::log(eta[k]) + log_norm[k];
+            am1[k] = a[k] - 1.0;
+            bm1[k] = b[k] - 1.0;
+        }
+
         loglikelihood = 0.0;
 
         for (arma::uword i = 0; i < n; ++i)
@@ -604,10 +444,9 @@ Rcpp::List beta_mixture_em_cpp(
             for (arma::uword k = 0; k < K; ++k)
             {
                 log_component[k] =
-                    std::log(eta[k]) +
-                    log_norm[k] +
-                    (a[k] - 1.0) * log_y[i] +
-                    (b[k] - 1.0) * log1m_y[i];
+                    log_prior[k] +
+                    am1[k] * log_y[i] +
+                    bm1[k] * log1m_y[i];
 
                 maximum =
                     std::max(maximum, log_component[k]);
@@ -631,8 +470,7 @@ Rcpp::List beta_mixture_em_cpp(
             const double log_mixture =
                 maximum + std::log(sum_exp);
 
-            loglikelihood +=
-                observation_weight[i] * log_mixture;
+            loglikelihood += log_mixture;
 
             for (arma::uword k = 0; k < K; ++k)
             {
@@ -642,7 +480,6 @@ Rcpp::List beta_mixture_em_cpp(
             }
         }
 
-        // Full parameter state for dual stopping criterion.
         for (arma::uword k = 0; k < K; ++k)
         {
             param_state[3 * k] = std::log(a[k]);
@@ -676,8 +513,6 @@ Rcpp::List beta_mixture_em_cpp(
         old_param_state = param_state;
         previous_loglikelihood = loglikelihood;
 
-        // Require at least two completed iterations so both criteria
-        // compare real successive states (not the Inf/NA warm-start).
         if (completed_iterations >= 2 &&
             parameter_criterion < tol &&
             loglik_criterion < tol)

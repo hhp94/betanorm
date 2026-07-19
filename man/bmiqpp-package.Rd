@@ -4,9 +4,17 @@
 \name{bmiqpp-package}
 \alias{bmiqpp}
 \alias{bmiqpp-package}
-\title{bmiqpp: BMIQ Calibration with Rcpp}
+\title{bmiqpp: Fast BMIQ Calibration for DNA Methylation Beta Values}
 \description{
-Internal package implementing the Horvath and Teschendorff BMIQ (beta-mixture quantile normalization) calibration in Rcpp. The core parameter estimation uses a Newton-Raphson algorithm with step halving for robust convergence when calibrating DNA methylation beta values.
+Fast beta-mixture quantile (BMIQ) calibration of DNA methylation beta values against a gold-standard profile, with optional two- or three-component mixtures. Mixture component parameters are estimated with a Newton-Raphson procedure and step-halving for robust convergence, implemented in 'C++' via 'Rcpp' and 'RcppArmadillo'. Also provides a lightweight quantile-normalization utility that maps each sample onto a target distribution without missing values. The BMIQ method is described in: Teschendorff, A.E., Marabita, F., Lechner, M., Bartlett, T., Tegner, J., Gomez-Cabrero, D. and Beck, S. (2013) \doi{10.1093/bioinformatics/bts680} "A beta-mixture quantile normalization method for correcting probe design bias in Illumina Infinium 450 k DNA methylation data". Quantile normalization follows: Bolstad, B.M., Irizarry, R.A., Astrand, M. and Speed, T.P. (2003) \doi{10.1093/bioinformatics/19.2.185} "A comparison of normalization methods for high density oligonucleotide array data based on variance and bias".
+}
+\seealso{
+Useful links:
+\itemize{
+  \item \url{https://github.com/hhp94/bmiqpp}
+  \item Report bugs at \url{https://github.com/hhp94/bmiqpp/issues}
+}
+
 }
 \author{
 \strong{Maintainer}: Hung Pham \email{amser.hoanghung@gmail.com} (\href{https://orcid.org/0000-0002-8271-9355}{ORCID}) [copyright holder]

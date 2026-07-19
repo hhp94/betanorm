@@ -1,7 +1,7 @@
 test_that("nL = 4 is rejected", {
   inputs <- make_calibration_inputs(n_probes = 400L, nL = 3L, seed = 1L)
   expect_error(
-    BMIQcalibration(
+    bmiq_calibration(
       datM = inputs$datM,
       goldstandard.beta = inputs$gold,
       nL = 4L,
@@ -15,7 +15,7 @@ test_that("nL = 4 is rejected", {
 test_that("nL = 2 with dynamic defaults works and leaves h.applied as NA", {
   inputs <- make_calibration_inputs(n_probes = 1200L, nL = 2L, seed = 2L)
 
-  result <- BMIQcalibration(
+  result <- bmiq_calibration(
     datM = inputs$datM,
     goldstandard.beta = inputs$gold,
     nL = 2L,
@@ -37,7 +37,7 @@ test_that("nL = 2 with dynamic defaults works and leaves h.applied as NA", {
 test_that("nL = 2, doH = TRUE fails clearly", {
   inputs <- make_calibration_inputs(n_probes = 400L, nL = 2L, seed = 3L)
   expect_error(
-    BMIQcalibration(
+    bmiq_calibration(
       datM = inputs$datM,
       goldstandard.beta = inputs$gold,
       nL = 2L,
@@ -52,7 +52,7 @@ test_that("nL = 2, doH = TRUE fails clearly", {
 test_that("nL = 2 truncated map remaps both sides and is continuous at the cut", {
   inputs <- make_calibration_inputs(n_probes = 2000L, nL = 2L, seed = 4L)
 
-  result <- BMIQcalibration(
+  result <- bmiq_calibration(
     datM = inputs$datM,
     goldstandard.beta = inputs$gold,
     nL = 2L,
@@ -179,7 +179,7 @@ test_that("normalizeNL2Truncated maps sample cut to gold cut from both sides", {
 test_that("nL = 3 retains U/H/M behavior with dynamic defaults", {
   inputs <- make_calibration_inputs(n_probes = 2000L, nL = 3L, seed = 5L)
 
-  result <- BMIQcalibration(
+  result <- bmiq_calibration(
     datM = inputs$datM,
     goldstandard.beta = inputs$gold,
     nL = 3L,
