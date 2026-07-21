@@ -3,9 +3,7 @@ $gold$initial_class_counts
 [1] 14961  5039
 
 $gold$eta
-          [,1]
-[1,] 0.7034938
-[2,] 0.2965062
+[1] 0.7034938 0.2965062
 
 $gold$component_means
 [1] 0.06826653 0.72471793
@@ -65,48 +63,46 @@ $samples[[1]]$sample_index
 [1] 1
 
 $samples[[1]]$sample_name
-[1] "CLHNS_6_EPICv1"
+[1] "CALERIE_18_EPICv1"
 
 $samples[[1]]$input_range
-[1] 0.000000 0.987739
+[1] 0.0000000 0.9856963
 
 $samples[[1]]$low_mode_window_count
-[1] 15718
+[1] 15570
 
 $samples[[1]]$high_mode_window_count
-[1] 4589
+[1] 4733
 
 $samples[[1]]$unmethylated_mode
-[1] 0.03822939
+[1] 0.03515341
 
 $samples[[1]]$methylated_mode
-[1] 0.8993623
+[1] 0.8948278
 
 $samples[[1]]$unmethylated_shift
-[1] 0.008322332
+[1] 0.005246345
 
 $samples[[1]]$methylated_shift
-[1] 0.02529824
+[1] 0.02076371
 
 $samples[[1]]$initial_thresholds
-[1] 0.2904699
+[1] 0.2866647
 
 $samples[[1]]$initial_class_counts
-[1] 14000  6000
+[1] 13880  6120
 
 $samples[[1]]$eta
-          [,1]
-[1,] 0.6978586
-[2,] 0.3021414
+[1] 0.6972054 0.3027946
 
 $samples[[1]]$component_means
-[1] 0.06730211 0.69705872
+[1] 0.06936421 0.71218919
 
 $samples[[1]]$component_a
-[1] 1.128649 3.448552
+[1] 1.083440 3.765814
 
 $samples[[1]]$component_b
-[1] 15.641236  1.498739
+[1] 14.536148  1.521846
 
 $samples[[1]]$component_fit_status
 [1] "converged" "converged"
@@ -121,44 +117,44 @@ $samples[[1]]$em_converged
 [1] FALSE
 
 $samples[[1]]$parameter_criterion
-[1] 0.005715269
+[1] 0.008306529
 
 $samples[[1]]$loglik_criterion
-[1] 1.389764e-05
+[1] 3.043872e-05
 
 $samples[[1]]$log_likelihood
-[1] 14608.53
+[1] 14336.17
 
 $samples[[1]]$subset_map_counts
-[1] 13989  6011
+[1] 13996  6004
 
 $samples[[1]]$thresholds
-[1] 0.2885583
+[1] 0.3048273
 
 $samples[[1]]$complete_class_counts
-[1] 14979  6389
+[1] 14975  6393
 
 $samples[[1]]$parameter_criterion_trace
-[1]         Inf 0.067381739 0.015557027 0.007670311 0.005715269
+[1]         Inf 0.055525318 0.013333241 0.008783421 0.008306529
 
 $samples[[1]]$loglik_criterion_trace
-[1]          Inf 9.266334e-04 4.217444e-05 1.952730e-05 1.389764e-05
+[1]          Inf 1.018996e-03 7.372126e-05 4.202536e-05 3.043872e-05
 
 $samples[[1]]$posterior_thresholds
-[1] 0.2885583
+[1] 0.3048273
 
 $samples[[1]]$nl2_sample_threshold
-[1] 0.2885583
+[1] 0.3048273
 
 $samples[[1]]$nl2_gold_threshold
 [1] 0.2736596
 
 $samples[[1]]$tail_counts
  U_left U_right  M_left M_right 
-  10219    4760    2455    3934 
+  10039    4936    2330    4063 
 
 $samples[[1]]$output_range
-[1] 0.0000000 0.9887049
+[1] 0.0000000 0.9864931
 
 $samples[[1]]$h_applied
 [1] NA

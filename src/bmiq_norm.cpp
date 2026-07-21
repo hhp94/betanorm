@@ -14,6 +14,7 @@ namespace
     struct BetaStats
     {
         double weight = 0.0;
+        double sum_w2 = 0.0;
         double mean = 0.0;
         double m2 = 0.0;
         double sum_log_y = 0.0;
@@ -39,9 +40,22 @@ namespace
             mean += (effective_weight / new_weight) * delta;
             m2 += effective_weight * delta * (y - mean);
             weight = new_weight;
+            sum_w2 += effective_weight * effective_weight;
 
             sum_log_y += effective_weight * log_y;
             sum_log1m_y += effective_weight * log1m_y;
+        }
+
+        // Kish effective sample size: (sum w)^2 / sum w^2. A soft E-step gives
+        // almost every observation a positive but negligible responsibility, so
+        // positive_count is a poor size guard; n_eff is not.
+        double effective_size() const
+        {
+            if (!(sum_w2 > 0.0))
+            {
+                return 0.0;
+            }
+            return (weight * weight) / sum_w2;
         }
     };
 
@@ -103,9 +117,9 @@ namespace
 
         if (!(stats.weight > 0.0) ||
             !std::isfinite(stats.weight) ||
-            stats.positive_count <= 1)
+            !(stats.effective_size() > 1.0))
         {
-            out.reason = "zero or insufficient effective weight";
+            out.reason = "zero or insufficient effective sample size";
             return out;
         }
 
@@ -291,6 +305,95 @@ void scan_finite_unit_interval_cpp(
     }
 }
 
+// Gather a contiguous run of sample rows out of a samples x probes matrix into
+// a probes x sample_count block. R matrices are column-major, so a sample
+// (row) is strided; the returned block stores each sample contiguously, which
+// makes the per-sample work and the scatter back cache-friendly without paying
+// for a full transpose.
+// [[Rcpp::export]]
+Rcpp::NumericMatrix gather_sample_block_cpp(
+    const Rcpp::NumericMatrix &x,
+    int first_sample,
+    int sample_count)
+{
+    const int n_samples = x.nrow();
+    const int n_probes = x.ncol();
+    const int first0 = first_sample - 1;
+
+    if (first0 < 0 ||
+        sample_count < 1 ||
+        first0 + sample_count > n_samples)
+    {
+        Rcpp::stop("Invalid sample block");
+    }
+
+    Rcpp::NumericMatrix block(n_probes, sample_count);
+
+    const double *x_ptr = REAL(x);
+    double *block_ptr = REAL(block);
+
+    for (int probe = 0; probe < n_probes; ++probe)
+    {
+        const R_xlen_t x_offset =
+            static_cast<R_xlen_t>(n_samples) * probe;
+
+        for (int local_sample = 0;
+             local_sample < sample_count;
+             ++local_sample)
+        {
+            block_ptr[
+                probe +
+                static_cast<R_xlen_t>(n_probes) * local_sample] =
+                x_ptr[x_offset + first0 + local_sample];
+        }
+    }
+
+    return block;
+}
+
+// Scatter a probes x sample_count block back into a samples x probes matrix.
+// This deliberately mutates `destination` in place, which is safe only when it
+// is a freshly allocated private matrix (never an alias of the caller's input);
+// bmiq_calibration() allocates `calibrated` for exactly this reason.
+// [[Rcpp::export]]
+void scatter_sample_block_cpp(
+    Rcpp::NumericMatrix destination,
+    const Rcpp::NumericMatrix &block,
+    int first_sample)
+{
+    const int n_samples = destination.nrow();
+    const int n_probes = destination.ncol();
+    const int sample_count = block.ncol();
+    const int first0 = first_sample - 1;
+
+    if (block.nrow() != n_probes ||
+        first0 < 0 ||
+        first0 + sample_count > n_samples)
+    {
+        Rcpp::stop("Invalid destination or sample block");
+    }
+
+    double *destination_ptr = REAL(destination);
+    const double *block_ptr = REAL(block);
+
+    for (int probe = 0; probe < n_probes; ++probe)
+    {
+        const R_xlen_t destination_offset =
+            static_cast<R_xlen_t>(n_samples) * probe;
+
+        for (int local_sample = 0;
+             local_sample < sample_count;
+             ++local_sample)
+        {
+            destination_ptr[
+                destination_offset + first0 + local_sample] =
+                block_ptr[
+                    probe +
+                    static_cast<R_xlen_t>(n_probes) * local_sample];
+        }
+    }
+}
+
 // [[Rcpp::export]]
 Rcpp::List beta_mixture_em_cpp(
     const arma::vec &y,
@@ -344,6 +447,11 @@ Rcpp::List beta_mixture_em_cpp(
 
     arma::vec log_component(K);
     arma::vec log_norm(K);
+    arma::vec log_prior(K);
+    arma::vec am1(K);
+    arma::vec bm1(K);
+    arma::vec prev_a(K);
+    arma::vec prev_b(K);
 
     Rcpp::CharacterVector fit_status(nL);
     Rcpp::CharacterVector fit_reason(nL);
@@ -363,6 +471,12 @@ Rcpp::List beta_mixture_em_cpp(
     for (int iter = 0; iter < maxiter; ++iter)
     {
         Rcpp::checkUserInterrupt();
+
+        // Retain the previous iteration's component shapes so the M-step below
+        // can refuse a candidate that would lower a component's weighted
+        // log-likelihood (generalized-EM ascent guard).
+        prev_a = a;
+        prev_b = b;
 
         // One pass: component weights (eta) and Beta sufficient stats.
         // stats[k].weight == sum_i responsibility(i, k).
@@ -410,12 +524,41 @@ Rcpp::List beta_mixture_em_cpp(
                     fit.reason);
             }
 
-            a[k] = fit.a;
-            b[k] = fit.b;
-            mu[k] = fit.a / (fit.a + fit.b);
+            // Generalized-EM ascent guard: accept the candidate only if it does
+            // not lower this component's weighted log-likelihood relative to the
+            // previous iteration's shapes under the current responsibilities.
+            // Each M-step re-initializes from method-of-moments, so a stalled
+            // Newton fit could otherwise decrease the objective and break the
+            // monotonicity that "usable" fits are assumed to preserve. eta is
+            // always the closed-form maximizer, so guarding the Beta shapes is
+            // enough to keep the outer log-likelihood non-decreasing.
+            bool retained = false;
+            if (iter > 0)
+            {
+                const double prev_loglik =
+                    beta_loglik_stats(prev_a[k], prev_b[k], stats[k]);
+                if (std::isfinite(prev_loglik) &&
+                    prev_loglik > fit.loglik)
+                {
+                    a[k] = prev_a[k];
+                    b[k] = prev_b[k];
+                    fit_status[k] = "converged";
+                    fit_reason[k] =
+                        "retained previous shapes; M-step candidate did not "
+                        "improve the weighted log-likelihood";
+                    retained = true;
+                }
+            }
 
-            fit_status[k] = fit.status;
-            fit_reason[k] = fit.reason;
+            if (!retained)
+            {
+                a[k] = fit.a;
+                b[k] = fit.b;
+                fit_status[k] = fit.status;
+                fit_reason[k] = fit.reason;
+            }
+
+            mu[k] = a[k] / (a[k] + b[k]);
 
             log_norm[k] =
                 std::lgamma(a[k] + b[k]) -
@@ -424,9 +567,6 @@ Rcpp::List beta_mixture_em_cpp(
         }
 
         // E-step terms independent of observation index i.
-        arma::vec log_prior(K);
-        arma::vec am1(K);
-        arma::vec bm1(K);
         for (arma::uword k = 0; k < K; ++k)
         {
             log_prior[k] = std::log(eta[k]) + log_norm[k];

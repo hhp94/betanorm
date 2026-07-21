@@ -2,14 +2,22 @@
 # Generator token: 10BE3573-1514-4C36-9D1C-5A225CD40393
 
 scan_finite_unit_interval_cpp <- function(x, name = "x", require_open = FALSE) {
-    invisible(.Call(`_bmiqpp_scan_finite_unit_interval_cpp`, x, name, require_open))
+    invisible(.Call(`_betanorm_scan_finite_unit_interval_cpp`, x, name, require_open))
+}
+
+gather_sample_block_cpp <- function(x, first_sample, sample_count) {
+    .Call(`_betanorm_gather_sample_block_cpp`, x, first_sample, sample_count)
+}
+
+scatter_sample_block_cpp <- function(destination, block, first_sample) {
+    invisible(.Call(`_betanorm_scatter_sample_block_cpp`, destination, block, first_sample))
 }
 
 beta_mixture_em_cpp <- function(y, initial_responsibility, nL = 3L, maxiter = 25L, tol = 1e-6, beta_maxit = 50L, beta_max_halving = 30L, beta_score_tol = 1e-10, min_shape = 1e-10, armijo = 1e-4, debug = FALSE) {
-    .Call(`_bmiqpp_beta_mixture_em_cpp`, y, initial_responsibility, nL, maxiter, tol, beta_maxit, beta_max_halving, beta_score_tol, min_shape, armijo, debug)
+    .Call(`_betanorm_beta_mixture_em_cpp`, y, initial_responsibility, nL, maxiter, tol, beta_maxit, beta_max_halving, beta_score_tol, min_shape, armijo, debug)
 }
 
 qnorm_target_rows_cpp <- function(obj, target) {
-    .Call(`_bmiqpp_qnorm_target_rows_cpp`, obj, target)
+    .Call(`_betanorm_qnorm_target_rows_cpp`, obj, target)
 }
 

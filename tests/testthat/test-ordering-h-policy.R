@@ -1,118 +1,107 @@
-test_that("ordering helpers enforce strict vs anchor policies", {
+make_em <- function(a, b, eta, mu, n = 6L) {
+  nL <- length(mu)
+  list(
+    a = matrix(a, ncol = 1L),
+    b = matrix(b, ncol = 1L),
+    eta = eta,
+    mu = matrix(mu, ncol = 1L),
+    w = matrix(seq_len(n * nL), nrow = n, ncol = nL),
+    fit_status = rep("converged", nL),
+    fit_reason = paste0("reason", seq_len(nL))
+  )
+}
+
+test_that("canonicalize_em_components sorts complete tuples by mean", {
+  em <- make_em(
+    a = c(8, 2, 5),
+    b = c(2, 8, 5),
+    eta = c(0.5, 0.3, 0.2),
+    mu = c(0.8, 0.2, 0.5)
+  )
+  ord <- order(c(0.8, 0.2, 0.5)) # c(2, 3, 1)
+
+  out <- canonicalize_em_components(em, "test")
+
+  expect_equal(as.numeric(out$mu[, 1L]), c(0.2, 0.5, 0.8))
+  expect_equal(as.numeric(out$a[, 1L]), c(2, 5, 8))
+  expect_equal(as.numeric(out$b[, 1L]), c(8, 5, 2))
+  expect_equal(out$eta, c(0.3, 0.2, 0.5))
+  expect_equal(out$fit_reason, paste0("reason", ord))
+  # Responsibility columns move with their component.
+  expect_equal(out$w, em$w[, ord, drop = FALSE])
+})
+
+test_that("canonicalize_em_components rejects invalid mixture parameters", {
+  bad <- make_em(
+    a = c(-1, 2, 5),
+    b = c(2, 8, 5),
+    eta = c(0.5, 0.3, 0.2),
+    mu = c(0.2, 0.5, 0.8)
+  )
   expect_error(
-    requireOrderedComponentMeans(c(0.1, 0.9, 0.5), "disordered"),
-    regexp = "not strictly increasing"
-  )
-  # U=0.1 < M=0.5 is enough for anchors even if H is disordered.
-  expect_silent(
-    requireOrderedAnchors(c(0.1, 0.9, 0.5), "disordered-H")
-  )
-  expect_error(
-    requireOrderedAnchors(c(0.8, 0.5, 0.4), "collapsed"),
-    regexp = "not separated"
-  )
-  expect_silent(
-    requireOrderedComponentMeans(c(0.1, 0.4, 0.8), "ordered")
+    canonicalize_em_components(bad, "test"),
+    regexp = "invalid mixture parameters"
   )
 })
 
-test_that("gold-standard fits still require complete component ordering", {
-  inputs <- make_calibration_inputs(n_probes = 800L, seed = 10L)
-  real_pipeline <- fitMixturePipeline
-
-  local_mocked_bindings(
-    fitMixturePipeline = function(beta,
-                                  thresholds,
-                                  nL,
-                                  nfit,
-                                  niter,
-                                  tol,
-                                  beta.maxit,
-                                  beta.score.tol,
-                                  fit.policy,
-                                  context,
-                                  debug = FALSE,
-                                  seed = 1L,
-                                  mean.order = c("strict", "anchors")) {
-      mean.order <- match.arg(mean.order)
-      fit <- real_pipeline(
-        beta = beta,
-        thresholds = thresholds,
-        nL = nL,
-        nfit = nfit,
-        niter = niter,
-        tol = tol,
-        beta.maxit = beta.maxit,
-        beta.score.tol = beta.score.tol,
-        fit.policy = fit.policy,
-        context = context,
-        debug = debug,
-        seed = seed,
-        mean.order = mean.order
-      )
-      if (identical(context, "Gold-standard")) {
-        fit$component_means <- c(0.2, 0.9, 0.5)
-        requireOrderedComponentMeans(
-          fit$component_means,
-          "Gold-standard mixture"
-        )
-      }
-      fit
-    },
-    .package = "bmiqpp"
+test_that("canonicalize_em_components rejects indistinguishable means", {
+  tied <- make_em(
+    a = c(2, 2),
+    b = c(2, 2),
+    eta = c(0.5, 0.5),
+    mu = c(0.5, 0.5)
   )
-
   expect_error(
-    bmiq_calibration(
-      datM = inputs$datM,
-      goldstandard.beta = inputs$gold,
-      nfit = 800L,
-      verbose = FALSE
-    ),
-    regexp = "not strictly increasing|Gold-standard"
+    canonicalize_em_components(tied, "test"),
+    regexp = "indistinguishable"
   )
 })
 
-test_that("optional H accepts separated U/M anchors despite disordered H", {
+# Force H normalization to fail through a guard that survives canonicalization:
+# push the methylated-component mean above every observation so there are no
+# methylated probes above it (empty upper-M tail). Returns a mock function for
+# fit_mixture; the caller must install it with local_mocked_bindings() in its
+# own frame so the binding stays live for the test body.
+mock_h_failure <- function(real) {
+  # Force `real` now: if it stayed a lazy promise it would resolve to the
+  # mocked binding (itself) once installed, causing infinite recursion.
+  force(real)
+  function(beta,
+           thresholds,
+           nL,
+           nfit,
+           niter,
+           tol,
+           beta.maxit,
+           beta.score.tol,
+           context,
+           debug = FALSE,
+           seed = 1L) {
+    fit <- real(
+      beta = beta,
+      thresholds = thresholds,
+      nL = nL,
+      nfit = nfit,
+      niter = niter,
+      tol = tol,
+      beta.maxit = beta.maxit,
+      beta.score.tol = beta.score.tol,
+      context = context,
+      debug = debug,
+      seed = seed
+    )
+    if (grepl("^Sample", context) && nL == 3L) {
+      fit$component_means <- c(0.15, 0.5, 1.5)
+    }
+    fit
+  }
+}
+
+test_that("optional H skips gracefully when H normalization fails", {
   inputs <- make_calibration_inputs(n_probes = 1500L, seed = 11L)
-  real_pipeline <- fitMixturePipeline
-
   local_mocked_bindings(
-    fitMixturePipeline = function(beta,
-                                  thresholds,
-                                  nL,
-                                  nfit,
-                                  niter,
-                                  tol,
-                                  beta.maxit,
-                                  beta.score.tol,
-                                  fit.policy,
-                                  context,
-                                  debug = FALSE,
-                                  seed = 1L,
-                                  mean.order = c("strict", "anchors")) {
-      mean.order <- match.arg(mean.order)
-      fit <- real_pipeline(
-        beta = beta,
-        thresholds = thresholds,
-        nL = nL,
-        nfit = nfit,
-        niter = niter,
-        tol = tol,
-        beta.maxit = beta.maxit,
-        beta.score.tol = beta.score.tol,
-        fit.policy = fit.policy,
-        context = context,
-        debug = debug,
-        seed = seed,
-        mean.order = mean.order
-      )
-      if (grepl("^Sample", context) && mean.order == "anchors" && nL == 3L) {
-        fit$component_means <- c(0.15, 0.85, 0.70)
-      }
-      fit
-    },
-    .package = "bmiqpp"
+    fit_mixture = mock_h_failure(fit_mixture),
+    .package = "betanorm"
   )
 
   result <- suppressWarnings(bmiq_calibration(
@@ -130,50 +119,15 @@ test_that("optional H accepts separated U/M anchors despite disordered H", {
   expect_true(all(is.finite(result$calibrated[1L, ])))
 })
 
-test_that("required H fails for the same disordered fit", {
+test_that("required H fails for the same fit", {
   inputs <- make_calibration_inputs(n_probes = 1500L, seed = 11L)
-  real_pipeline <- fitMixturePipeline
-
   local_mocked_bindings(
-    fitMixturePipeline = function(beta,
-                                  thresholds,
-                                  nL,
-                                  nfit,
-                                  niter,
-                                  tol,
-                                  beta.maxit,
-                                  beta.score.tol,
-                                  fit.policy,
-                                  context,
-                                  debug = FALSE,
-                                  seed = 1L,
-                                  mean.order = c("strict", "anchors")) {
-      mean.order <- match.arg(mean.order)
-      fit <- real_pipeline(
-        beta = beta,
-        thresholds = thresholds,
-        nL = nL,
-        nfit = nfit,
-        niter = niter,
-        tol = tol,
-        beta.maxit = beta.maxit,
-        beta.score.tol = beta.score.tol,
-        fit.policy = fit.policy,
-        context = context,
-        debug = debug,
-        seed = seed,
-        mean.order = mean.order
-      )
-      if (grepl("^Sample", context) && mean.order == "anchors" && nL == 3L) {
-        fit$component_means <- c(0.15, 0.85, 0.70)
-      }
-      fit
-    },
-    .package = "bmiqpp"
+    fit_mixture = mock_h_failure(fit_mixture),
+    .package = "betanorm"
   )
 
   expect_error(
-    bmiq_calibration(
+    suppressWarnings(bmiq_calibration(
       datM = inputs$datM,
       goldstandard.beta = inputs$gold,
       doH = TRUE,
@@ -182,7 +136,7 @@ test_that("required H fails for the same disordered fit", {
       nfit = 1500L,
       niter = 8L,
       verbose = FALSE
-    ),
-    regexp = "not strictly increasing|H|failed"
+    )),
+    regexp = "H|failed|methylated"
   )
 })

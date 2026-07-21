@@ -37,8 +37,12 @@ columns. Values must be finite, non-missing, and in \eqn{[0, 1]}.}
 column of \code{datM}.}
 
 \item{nL}{Number of mixture components: \code{3} for unmethylated /
-intermediate / methylated (default), or \code{2} for unmethylated /
-methylated only.}
+intermediate / methylated (default, legacy three-state BMIQ), or \code{2}
+for unmethylated / methylated only. Choose \code{nL} by whether the
+intermediate component is scientifically appropriate for your data,
+not as a convergence setting: either model can be run further toward
+convergence by raising \code{niter} (see below). Using two components is not
+a mathematical substitute for converging a three-component model.}
 
 \item{doH}{Whether to normalize the intermediate (H) component.
 Default is \code{TRUE} when \code{nL = 3} and \code{FALSE} when \code{nL = 2}.}
@@ -49,7 +53,11 @@ Default is \code{TRUE} when \code{nL = 3} and \code{FALSE} when \code{nL = 2}.}
 Defaults to \code{c(0.2, 0.75)} for \code{nL = 3} and \code{0.5} for \code{nL = 2}.}
 
 \item{niter}{Maximum outer EM iterations for the gold-standard fit and
-each sample fit (same as legacy).}
+each sample fit. Default \code{5} is a legacy-compatibility setting matching
+common three-state BMIQ pipelines. Raising \code{niter} above \code{5} with
+\code{nL = 3} warns only that results will no longer match legacy
+five-iteration output; running a three-component fit further toward
+convergence is otherwise a valid choice.}
 
 \item{tol}{Convergence tolerance for the mixture fit.}
 
@@ -67,7 +75,9 @@ converged.
 \item{h.policy}{What to do if intermediate (H) normalization fails when
 \code{doH = TRUE}.
 \itemize{
-\item \code{"optional"} (default): keep U/M calibration for that sample.
+\item \code{"optional"} (default): keep the U-plus-upper-M calibration for that
+sample (lower-M observations, normally absorbed into the H map, are
+left unchanged).
 \item \code{"require"}: treat the sample as failed.
 }}
 
@@ -105,13 +115,27 @@ Use \code{as.matrix()} to extract \code{calibrated}, and \code{print()} for a sh
 summary.
 }
 \description{
-Adjust DNA methylation beta values so each sample matches a gold-standard
-beta profile using beta-mixture quantile (BMIQ) normalization.
+BMIQ-style calibration of DNA methylation beta values to a gold-standard
+beta profile (beta-mixture quantile mapping). Provided for pipelines that
+require this procedure; defaults target legacy BMIQ compatibility.
 }
 \details{
+\strong{Choosing \code{nL} and \code{niter} are independent decisions.} \code{nL} is a
+modeling choice (is an intermediate component appropriate?); \code{niter} is a
+stopping choice (how far to run EM). The \code{nL = 3}, \code{niter = 5} default is
+the intentional legacy configuration for clock-style and other pipelines
+that expect historical BMIQ behavior: the five-iteration cap is a
+compatibility choice, not a claim of statistical convergence. Either the
+two- or three-component model can be run further toward convergence by
+raising \code{niter} (and tightening \code{fit.policy} as needed); with \code{nL = 3}
+this emits a warning only because the output then departs from legacy
+five-iteration results.
+
 With \code{nL = 3}, samples are fit as unmethylated (U), intermediate (H), and
 methylated (M) components, then quantile-normalized to the gold standard
-(with continuous H stitching when H runs).
+(with continuous H stitching when H runs). When H is skipped
+(\code{h.policy = "optional"}), U and the upper-M tail are calibrated and
+lower-M observations are left unchanged, matching legacy BMIQ.
 
 With \code{nL = 2}, only U and M are used (no H step). Normalization uses
 truncated component quantile maps joined at the gold U/M threshold so both

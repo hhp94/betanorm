@@ -3,10 +3,7 @@ $gold$initial_class_counts
 [1] 13432  3267  3301
 
 $gold$eta
-          [,1]
-[1,] 0.6519266
-[2,] 0.1761522
-[3,] 0.1719212
+[1] 0.6519266 0.1761522 0.1719212
 
 $gold$component_means
 [1] 0.05699728 0.46688069 0.84029743
@@ -66,55 +63,52 @@ $samples[[1]]$sample_index
 [1] 1
 
 $samples[[1]]$sample_name
-[1] "CLHNS_6_EPICv1"
+[1] "CALERIE_18_EPICv1"
 
 $samples[[1]]$input_range
-[1] 0.000000 0.987739
+[1] 0.0000000 0.9856963
 
 $samples[[1]]$low_mode_window_count
-[1] 15718
+[1] 15570
 
 $samples[[1]]$high_mode_window_count
-[1] 4589
+[1] 4733
 
 $samples[[1]]$unmethylated_mode
-[1] 0.03822939
+[1] 0.03515341
 
 $samples[[1]]$methylated_mode
-[1] 0.8993623
+[1] 0.8948278
 
 $samples[[1]]$unmethylated_shift
-[1] 0.008774729
+[1] 0.005698742
 
 $samples[[1]]$methylated_shift
-[1] 0.02843727
+[1] 0.02390274
 
 $samples[[1]]$initial_thresholds
-[1] 0.1866986 0.7294050
+[1] 0.1836227 0.7248705
 
 $samples[[1]]$initial_class_counts
-[1] 13133  3424  3443
+[1] 12992  3292  3716
 
 $samples[[1]]$eta
-          [,1]
-[1,] 0.6664402
-[2,] 0.1665765
-[3,] 0.1669834
+[1] 0.6605188 0.1586533 0.1808280
 
 $samples[[1]]$component_means
-[1] 0.05954631 0.46632352 0.84904380
+[1] 0.06026196 0.45399747 0.85087212
 
 $samples[[1]]$component_a
-[1]  1.247409  2.721228 27.177706
+[1]  1.205616  2.673045 30.218396
 
 $samples[[1]]$component_b
-[1] 19.701151  3.114266  4.832075
+[1] 18.800639  3.214752  5.296219
 
 $samples[[1]]$component_fit_status
-[1] "converged" "converged" "converged"
+[1] "max_iter"  "converged" "converged"
 
 $samples[[1]]$component_fit_reason
-[1] "score tolerance reached" "score tolerance reached" "score tolerance reached"
+[1] "maximum iterations reached" "score tolerance reached"    "score tolerance reached"   
 
 $samples[[1]]$em_iterations
 [1] 5
@@ -123,50 +117,50 @@ $samples[[1]]$em_converged
 [1] FALSE
 
 $samples[[1]]$parameter_criterion
-[1] 0.03640292
+[1] 0.03805151
 
 $samples[[1]]$loglik_criterion
-[1] 0.0002155115
+[1] 0.0002589632
 
 $samples[[1]]$log_likelihood
-[1] 15408.49
+[1] 15347.91
 
 $samples[[1]]$subset_map_counts
-[1] 13493  3010  3497
+[1] 13414  2852  3734
 
 $samples[[1]]$thresholds
-[1] 0.2222905 0.7243954
+[1] 0.2246092 0.7224374
 
 $samples[[1]]$complete_class_counts
-[1] 14448  3207  3713
+[1] 14366  3027  3975
 
 $samples[[1]]$parameter_criterion_trace
-[1]        Inf 0.19803130 0.09097412 0.05334287 0.03640292
+[1]        Inf 0.20115318 0.09224386 0.05464732 0.03805151
 
 $samples[[1]]$loglik_criterion_trace
-[1]          Inf 0.0080726779 0.0014337463 0.0004444931 0.0002155115
+[1]          Inf 0.0081040923 0.0013978325 0.0004647471 0.0002589632
 
 $samples[[1]]$posterior_thresholds
-[1] 0.2222905 0.7243954
+[1] 0.2246092 0.7224374
 
 $samples[[1]]$tail_counts
  U_left U_right  M_left M_right 
-   9338    5110    1575    2138 
+   9173    5193    1685    2290 
 
 $samples[[1]]$H_count
-[1] 4782
+[1] 4712
 
 $samples[[1]]$H_input_range
-[1] 0.2223585 0.8490312
+[1] 0.2248044 0.8508293
 
 $samples[[1]]$H_output_anchors
-[1] 0.1650693 0.8434680
+[1] 0.1626207 0.8439118
 
 $samples[[1]]$H_scale
-[1] 1.082541
+[1] 1.088281
 
 $samples[[1]]$output_range
-[1] 0.0000000 0.9967223
+[1] 0.0000000 0.9966995
 
 $samples[[1]]$h_applied
 [1] TRUE

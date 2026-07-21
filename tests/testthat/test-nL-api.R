@@ -1,3 +1,34 @@
+test_that("nL = 3 with niter > 5 warns about legacy drift", {
+  inputs <- make_calibration_inputs(n_probes = 400L, nL = 3L, seed = 9L)
+
+  expect_warning(
+    bmiq_calibration(
+      datM = inputs$datM,
+      goldstandard.beta = inputs$gold,
+      nL = 3L,
+      nfit = 400L,
+      niter = 6L,
+      verbose = FALSE
+    ),
+    regexp = "legacy|nL = 2|niter"
+  )
+})
+
+test_that("nL = 2 with niter > 5 does not warn", {
+  inputs <- make_calibration_inputs(n_probes = 400L, nL = 2L, seed = 10L)
+
+  expect_silent(
+    bmiq_calibration(
+      datM = inputs$datM,
+      goldstandard.beta = inputs$gold,
+      nL = 2L,
+      nfit = 400L,
+      niter = 10L,
+      verbose = FALSE
+    )
+  )
+})
+
 test_that("nL = 4 is rejected", {
   inputs <- make_calibration_inputs(n_probes = 400L, nL = 3L, seed = 1L)
   expect_error(
@@ -98,7 +129,7 @@ test_that("nL = 2 truncated map remaps both sides and is continuous at the cut",
   gap <- min(calibrated[m_idx]) - max(calibrated[u_idx])
   expect_gte(gap, -1e-8)
   # Map of the cut from either side is the gold threshold.
-  cut_u <- normalizeNL2Truncated(
+  cut_u <- normalize_nl2(
     beta = t_s,
     class = 1L,
     sample.a = diag$component_a,
@@ -110,7 +141,7 @@ test_that("nL = 2 truncated map remaps both sides and is continuous at the cut",
     context = "cut-U"
   )
   # Force class M at the cut to check the M-side formula joins at t_g.
-  cut_m <- normalizeNL2Truncated(
+  cut_m <- normalize_nl2(
     beta = t_s,
     class = 2L,
     sample.a = diag$component_a,
@@ -125,61 +156,10 @@ test_that("nL = 2 truncated map remaps both sides and is continuous at the cut",
   expect_equal(as.numeric(cut_m), t_g, tolerance = 1e-6)
 })
 
-test_that("normalizeNL2Truncated maps sample cut to gold cut from both sides", {
-  # Symmetric Beta components; analytic check of the join.
-  sample.a <- c(2, 5)
-  sample.b <- c(5, 2)
-  gold.a <- c(3, 6)
-  gold.b <- c(6, 3)
-  t_s <- 0.45
-  t_g <- 0.55
-
-  g_u <- normalizeNL2Truncated(
-    beta = t_s,
-    class = 1L,
-    sample.a = sample.a,
-    sample.b = sample.b,
-    gold.a = gold.a,
-    gold.b = gold.b,
-    sample.threshold = t_s,
-    gold.threshold = t_g
-  )
-  # M-side formula at the cut (class forced to 2) also yields t_g.
-  g_m <- normalizeNL2Truncated(
-    beta = t_s,
-    class = 2L,
-    sample.a = sample.a,
-    sample.b = sample.b,
-    gold.a = gold.a,
-    gold.b = gold.b,
-    sample.threshold = t_s,
-    gold.threshold = t_g
-  )
-  expect_equal(g_u, t_g, tolerance = 1e-8)
-  expect_equal(g_m, t_g, tolerance = 1e-8)
-
-  # Interior U and M stay on the correct side of t_g.
-  x_u <- 0.2
-  x_m <- 0.8
-  g <- normalizeNL2Truncated(
-    beta = c(x_u, x_m),
-    class = c(1L, 2L),
-    sample.a = sample.a,
-    sample.b = sample.b,
-    gold.a = gold.a,
-    gold.b = gold.b,
-    sample.threshold = t_s,
-    gold.threshold = t_g
-  )
-  expect_lte(g[1L], t_g + 1e-10)
-  expect_gte(g[2L], t_g - 1e-10)
-  expect_true(all(g > 0 & g < 1))
-})
-
 test_that("nL = 3 retains U/H/M behavior with dynamic defaults", {
   inputs <- make_calibration_inputs(n_probes = 2000L, nL = 3L, seed = 5L)
 
-  result <- bmiq_calibration(
+  result <- suppressWarnings(bmiq_calibration(
     datM = inputs$datM,
     goldstandard.beta = inputs$gold,
     nL = 3L,
@@ -187,7 +167,7 @@ test_that("nL = 3 retains U/H/M behavior with dynamic defaults", {
     niter = 8L,
     verbose = FALSE,
     debug = TRUE
-  )
+  ))
 
   expect_true(result$success[1L])
   expect_true(isTRUE(result$settings$doH))

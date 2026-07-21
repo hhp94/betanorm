@@ -1,3 +1,3 @@
-if(interactive()) {
+if (interactive()) {
   library(devtools)
 }

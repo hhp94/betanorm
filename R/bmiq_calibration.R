@@ -1,23 +1,32 @@
-validateThresholds <- function(
+check_thresholds <- function(
   thresholds,
   nL,
   name,
   require.unit.interval = FALSE
 ) {
-  if (length(thresholds) != nL - 1L) {
-    stop(name, " must have length ", nL - 1L, ".", call. = FALSE)
+  if (!is.numeric(thresholds) || length(thresholds) != nL - 1L) {
+    stop(
+      name,
+      " must be a numeric vector of length ",
+      nL - 1L,
+      ".",
+      call. = FALSE
+    )
+  }
+  if (any(!is.finite(thresholds))) {
+    stop(name, " must contain only finite values.", call. = FALSE)
   }
   if (require.unit.interval &&
-    any(!is.finite(thresholds) | thresholds <= 0 | thresholds >= 1)) {
+    any(thresholds <= 0 | thresholds >= 1)) {
     stop(name, " must lie strictly inside (0, 1).", call. = FALSE)
   }
-  if (is.unsorted(thresholds, strictly = TRUE)) {
+  if (any(diff(thresholds) <= 0)) {
     stop(name, " must be strictly increasing.", call. = FALSE)
   }
-  invisible(NULL)
+  invisible(thresholds)
 }
 
-classifyByThresholds <- function(beta, thresholds) {
+class_by_thresh <- function(beta, thresholds) {
   class <- rep.int(1L, length(beta))
   for (boundary in seq_along(thresholds)) {
     class[beta > thresholds[boundary]] <- boundary + 1L
@@ -25,7 +34,7 @@ classifyByThresholds <- function(beta, thresholds) {
   class
 }
 
-requireAllClasses <- function(class, nL, context, min.count = 1L) {
+require_all_classes <- function(class, nL, context, min.count = 1L) {
   counts <- tabulate(class, nbins = nL)
   if (any(counts < min.count)) {
     stop(
@@ -41,7 +50,7 @@ requireAllClasses <- function(class, nL, context, min.count = 1L) {
   counts
 }
 
-thresholdsFromDensityCrossings <- function(
+density_thresholds <- function(
   a,
   b,
   eta,
@@ -54,155 +63,122 @@ thresholdsFromDensityCrossings <- function(
   means <- as.numeric(component.means)
   nL <- length(means)
 
-  if (nL < 2L) {
-    stop(context, " needs at least two components.", call. = FALSE)
+  if (nL < 2L ||
+    length(a) != nL ||
+    length(b) != nL ||
+    length(eta) != nL) {
+    stop(context, " has inconsistent mixture dimensions.", call. = FALSE)
   }
-  if (length(a) != nL || length(b) != nL || length(eta) != nL) {
+
+  if (any(!is.finite(c(a, b, eta, means))) ||
+    any(a <= 0) || any(b <= 0) || any(eta <= 0) ||
+    any(means <= 0 | means >= 1) ||
+    any(diff(means) <= 0)) {
     stop(
       context,
-      " a, b, eta, and component.means must each have length ",
-      nL,
+      " has invalid or unordered mixture parameters.",
+      call. = FALSE
+    )
+  }
+
+  # The desired boundary between adjacent components k and k + 1 (ordered by
+  # increasing mean) is where the lower-mean component stops dominating the
+  # weighted density and the higher-mean component takes over. Two Beta
+  # densities can cross twice, so we require that specific orientation.
+  find_crossing <- function(k) {
+    lo <- means[k]
+    hi <- means[k + 1L]
+
+    da <- a[k] - a[k + 1L]
+    db <- b[k] - b[k + 1L]
+
+    constant <-
+      log(eta[k]) - lbeta(a[k], b[k]) -
+      log(eta[k + 1L]) + lbeta(a[k + 1L], b[k + 1L])
+
+    log_score_diff <- function(x) {
+      constant + da * log(x) + db * log1p(-x)
+    }
+
+    slope <- function(x) {
+      da / x - db / (1 - x)
+    }
+
+    # The log-density ratio has at most one interior stationary point.
+    cuts <- c(lo, hi)
+    denominator <- da + db
+
+    if (denominator != 0) {
+      turning.point <- da / denominator
+      if (is.finite(turning.point) &&
+        turning.point > lo &&
+        turning.point < hi) {
+        cuts <- sort(c(lo, turning.point, hi))
+      }
+    }
+
+    values <- vapply(cuts, log_score_diff, numeric(1L))
+    if (any(!is.finite(values))) {
+      stop(
+        context,
+        " produced a non-finite density ratio for boundary ",
+        k,
+        ".",
+        call. = FALSE
+      )
+    }
+
+    for (i in seq_len(length(cuts) - 1L)) {
+      left <- cuts[i]
+      right <- cuts[i + 1L]
+      f.left <- values[i]
+      f.right <- values[i + 1L]
+
+      # Exact endpoint root with the required lower-to-higher orientation.
+      if (f.left == 0 && slope(left) < 0) {
+        return(left)
+      }
+      if (f.right == 0 && slope(right) < 0) {
+        return(right)
+      }
+
+      # Component k dominates on the left and k + 1 on the right.
+      if (f.left > 0 && f.right < 0) {
+        return(
+          stats::uniroot(
+            log_score_diff,
+            interval = c(left, right),
+            tol = sqrt(.Machine$double.eps)
+          )$root
+        )
+      }
+    }
+
+    stop(
+      context,
+      " has no lower-to-higher weighted-density crossing between means ",
+      signif(lo, 8),
+      " and ",
+      signif(hi, 8),
+      " for boundary ",
+      k,
       ".",
       call. = FALSE
     )
   }
-  if (any(!is.finite(a) | !is.finite(b) | !is.finite(eta) | !is.finite(means))) {
-    stop(context, " mixture parameters must be finite.", call. = FALSE)
-  }
-  if (any(a <= 0) || any(b <= 0) || any(eta <= 0)) {
+
+  thresholds <- vapply(
+    seq_len(nL - 1L),
+    find_crossing,
+    numeric(1L)
+  )
+
+  if (any(diff(thresholds) <= 0)) {
     stop(
       context,
-      " shapes and mixture weights must be strictly positive.",
-      call. = FALSE
-    )
-  }
-
-  log_score_diff <- function(t, k) {
-    (log(eta[k]) + stats::dbeta(t, a[k], b[k], log = TRUE)) -
-      (log(eta[k + 1L]) + stats::dbeta(t, a[k + 1L], b[k + 1L], log = TRUE))
-  }
-
-  find_crossing <- function(k) {
-    lo <- min(means[k], means[k + 1L])
-    hi <- max(means[k], means[k + 1L])
-    if (!(hi > lo)) {
-      stop(
-        context,
-        " adjacent component means are not separated for boundary ",
-        k,
-        " (means: ",
-        paste(signif(means, 8), collapse = ", "),
-        ").",
-        call. = FALSE
-      )
-    }
-
-    span <- hi - lo
-    left <- lo + 1e-8 * span
-    right <- hi - 1e-8 * span
-    if (!(right > left)) {
-      left <- lo
-      right <- hi
-    }
-
-    f_left <- log_score_diff(left, k)
-    f_right <- log_score_diff(right, k)
-    if (!is.finite(f_left) || !is.finite(f_right)) {
-      stop(
-        context,
-        " non-finite weighted log-density at boundary ",
-        k,
-        " endpoints.",
-        call. = FALSE
-      )
-    }
-    # An exact zero at a bracket endpoint is already the crossing.
-    exact_endpoint <- function() {
-      if (f_left == 0) return(left)
-      if (f_right == 0) return(right)
-      NULL
-    }
-
-    hit <- exact_endpoint()
-    if (!is.null(hit)) {
-      return(hit)
-    }
-
-    if (f_left * f_right > 0) {
-      grid <- seq(left, right, length.out = 257L)
-      vals <- vapply(grid, log_score_diff, numeric(1L), k = k)
-      if (any(!is.finite(vals))) {
-        stop(
-          context,
-          " non-finite weighted log-density on search grid for boundary ",
-          k,
-          ".",
-          call. = FALSE
-        )
-      }
-      sign_change <- which(vals[-length(vals)] * vals[-1L] <= 0)
-      if (!length(sign_change)) {
-        stop(
-          context,
-          " no weighted-density crossing between component means for ",
-          "boundary ",
-          k,
-          " (means ",
-          signif(lo, 8),
-          ", ",
-          signif(hi, 8),
-          "; a = ",
-          paste(signif(a[k:(k + 1L)], 6), collapse = "/"),
-          "; b = ",
-          paste(signif(b[k:(k + 1L)], 6), collapse = "/"),
-          "; eta = ",
-          paste(signif(eta[k:(k + 1L)], 6), collapse = "/"),
-          ").",
-          call. = FALSE
-        )
-      }
-      i <- sign_change[[1L]]
-      left <- grid[i]
-      right <- grid[i + 1L]
-      f_left <- vals[i]
-      f_right <- vals[i + 1L]
-      hit <- exact_endpoint()
-      if (!is.null(hit)) {
-        return(hit)
-      }
-    }
-
-    root <- tryCatch(
-      stats::uniroot(
-        log_score_diff,
-        interval = c(left, right),
-        k = k,
-        tol = .Machine$double.eps^0.5
-      )$root,
-      error = function(e) {
-        stop(
-          context,
-          " failed to solve weighted-density crossing for boundary ",
-          k,
-          ": ",
-          conditionMessage(e),
-          call. = FALSE
-        )
-      }
-    )
-    root
-  }
-
-  thresholds <- vapply(seq_len(nL - 1L), find_crossing, numeric(1L))
-
-  if (is.unsorted(thresholds, strictly = TRUE)) {
-    stop(
-      context,
-      " density-crossing thresholds are not strictly increasing: ",
+      " density boundaries are not ordinal: ",
       paste(signif(thresholds, 8), collapse = ", "),
-      " (means: ",
-      paste(signif(means, 8), collapse = ", "),
-      ").",
+      ".",
       call. = FALSE
     )
   }
@@ -214,7 +190,7 @@ thresholdsFromDensityCrossings <- function(
 # Sample cut t_s and gold cut t_g are the U/M density-crossing thresholds.
 # U side (x <= t_s): conditional quantile of F_sU on (0, t_s] -> (0, t_g].
 # M side (x > t_s): conditional upper-tail map of F_sM on (t_s, 1] -> (t_g, 1].
-normalizeNL2Truncated <- function(
+normalize_nl2 <- function(
   beta,
   class,
   sample.a,
@@ -252,41 +228,56 @@ normalizeNL2Truncated <- function(
     )
   }
 
-  checkCdf <- function(value, label, require.le.one) {
-    ok <- is.finite(value) && value > 0 && (!require.le.one || value <= 1)
-    if (!ok) {
+  # Work in log-probability throughout: an extreme but nonzero tail mass can
+  # underflow pbeta() to exactly 0 on the natural scale and force a spurious
+  # rejection, whereas log.p returns a finite log-mass. A conditional CDF
+  # (numerator log-mass minus threshold log-mass) is clamped at 0 (probability
+  # 1), then re-inflated by the gold threshold log-mass before qbeta().
+  check_log_mass <- function(value, label) {
+    # A real probability has log-mass <= 0; a tiny positive value is rounding
+    # noise at prob = 1 and is harmless, but -Inf means the threshold sits on
+    # the boundary with no usable conditioning mass.
+    if (!is.finite(value)) {
       stop(
         context,
         " ",
         label,
-        " at threshold is unusable (",
+        " at threshold is unusable (log = ",
         signif(value, 8),
         ").",
         call. = FALSE
       )
     }
-    value
+    min(0, value)
   }
 
-  FsU_ts <- checkCdf(
-    stats::pbeta(sample.threshold, sample.a[1L], sample.b[1L], lower.tail = TRUE),
-    "sample U CDF",
-    require.le.one = FALSE
+  log.FsU.ts <- check_log_mass(
+    stats::pbeta(
+      sample.threshold, sample.a[1L], sample.b[1L],
+      lower.tail = TRUE, log.p = TRUE
+    ),
+    "sample U CDF"
   )
-  FsM_ts_upper <- checkCdf(
-    stats::pbeta(sample.threshold, sample.a[2L], sample.b[2L], lower.tail = FALSE),
-    "sample M upper-tail CDF",
-    require.le.one = FALSE
+  log.FsM.ts <- check_log_mass(
+    stats::pbeta(
+      sample.threshold, sample.a[2L], sample.b[2L],
+      lower.tail = FALSE, log.p = TRUE
+    ),
+    "sample M upper-tail CDF"
   )
-  FgU_tg <- checkCdf(
-    stats::pbeta(gold.threshold, gold.a[1L], gold.b[1L], lower.tail = TRUE),
-    "gold U CDF",
-    require.le.one = TRUE
+  log.FgU.tg <- check_log_mass(
+    stats::pbeta(
+      gold.threshold, gold.a[1L], gold.b[1L],
+      lower.tail = TRUE, log.p = TRUE
+    ),
+    "gold U CDF"
   )
-  FgM_tg_upper <- checkCdf(
-    stats::pbeta(gold.threshold, gold.a[2L], gold.b[2L], lower.tail = FALSE),
-    "gold M upper-tail CDF",
-    require.le.one = TRUE
+  log.FgM.tg <- check_log_mass(
+    stats::pbeta(
+      gold.threshold, gold.a[2L], gold.b[2L],
+      lower.tail = FALSE, log.p = TRUE
+    ),
+    "gold M upper-tail CDF"
   )
 
   out <- beta
@@ -294,34 +285,36 @@ normalizeNL2Truncated <- function(
   m_idx <- which(class == 2L)
 
   if (length(u_idx)) {
-    u <- stats::pbeta(
-      beta[u_idx],
-      sample.a[1L],
-      sample.b[1L],
-      lower.tail = TRUE
-    ) / FsU_ts
-    u <- pmin(1, pmax(0, u))
+    log.u <- pmin(
+      0,
+      stats::pbeta(
+        beta[u_idx], sample.a[1L], sample.b[1L],
+        lower.tail = TRUE, log.p = TRUE
+      ) - log.FsU.ts
+    )
     out[u_idx] <- stats::qbeta(
-      u * FgU_tg,
+      log.u + log.FgU.tg,
       gold.a[1L],
       gold.b[1L],
-      lower.tail = TRUE
+      lower.tail = TRUE,
+      log.p = TRUE
     )
   }
 
   if (length(m_idx)) {
-    r <- stats::pbeta(
-      beta[m_idx],
-      sample.a[2L],
-      sample.b[2L],
-      lower.tail = FALSE
-    ) / FsM_ts_upper
-    r <- pmin(1, pmax(0, r))
+    log.r <- pmin(
+      0,
+      stats::pbeta(
+        beta[m_idx], sample.a[2L], sample.b[2L],
+        lower.tail = FALSE, log.p = TRUE
+      ) - log.FsM.ts
+    )
     out[m_idx] <- stats::qbeta(
-      r * FgM_tg_upper,
+      log.r + log.FgM.tg,
       gold.a[2L],
       gold.b[2L],
-      lower.tail = FALSE
+      lower.tail = FALSE,
+      log.p = TRUE
     )
   }
 
@@ -331,7 +324,7 @@ normalizeNL2Truncated <- function(
   out
 }
 
-estimateMode <- function(x, context) {
+estimate_mode <- function(x, context) {
   if (!length(x)) {
     stop(context, " is empty; cannot estimate mode.", call. = FALSE)
   }
@@ -339,43 +332,78 @@ estimateMode <- function(x, context) {
     return(x[1L])
   }
   estimate <- density(x)
-  estimate$x[which.max(estimate$y)]
+  # density() is not boundary-corrected, so its Gaussian tails can place the
+  # mode just outside the unit interval; clamp so it can only shift the
+  # initialization thresholds toward, never past, a valid beta value.
+  mode <- estimate$x[which.max(estimate$y)]
+  min(1, max(0, mode))
 }
 
-requireOrderedComponentMeans <- function(mu, context) {
-  mu <- as.numeric(mu)
-  if (is.unsorted(mu, strictly = TRUE)) {
+# Mixture component labels are arbitrary, so canonicalize each fit by sorting
+# complete component tuples (a, b, eta, mu, responsibilities, fit status) by
+# increasing mean. Downstream code can then treat component 1 as U and
+# component nL as M, and density_thresholds() can assume adjacent components
+# are ordered. Never sort a, b, eta, or thresholds independently.
+canonicalize_em_components <- function(em, context) {
+  a <- as.numeric(em$a[, 1L])
+  b <- as.numeric(em$b[, 1L])
+  eta <- as.numeric(em$eta)
+  mu <- as.numeric(em$mu[, 1L])
+
+  if (any(!is.finite(c(a, b, eta, mu))) ||
+    any(a <= 0) || any(b <= 0) || any(eta <= 0) ||
+    any(mu <= 0 | mu >= 1)) {
+    stop(context, " returned invalid mixture parameters.", call. = FALSE)
+  }
+
+  ord <- order(mu)
+
+  em$a <- em$a[ord, , drop = FALSE]
+  em$b <- em$b[ord, , drop = FALSE]
+  em$mu <- em$mu[ord, , drop = FALSE]
+  em$eta <- em$eta[ord]
+  em$w <- em$w[, ord, drop = FALSE]
+  em$fit_status <- em$fit_status[ord]
+  em$fit_reason <- em$fit_reason[ord]
+
+  mu <- as.numeric(em$mu[, 1L])
+  if (any(diff(mu) <= 0)) {
     stop(
       context,
-      " component means are not strictly increasing: ",
+      " has indistinguishable component means: ",
       paste(signif(mu, 8), collapse = ", "),
       ".",
       call. = FALSE
     )
   }
-  invisible(mu)
+
+  em
 }
 
-requireOrderedAnchors <- function(mu, context) {
-  mu <- as.numeric(mu)
-  if (!length(mu) || any(!is.finite(mu))) {
-    stop(context, " has missing or non-finite component means.", call. = FALSE)
-  }
-  if (mu[1L] >= mu[length(mu)]) {
-    stop(
-      context,
-      " U and M component means are not separated (",
-      signif(mu[1L], 8),
-      " vs ",
-      signif(mu[length(mu)], 8),
-      "); U/M anchoring is impossible.",
-      call. = FALSE
+# Draw fit indices reproducibly without disturbing the caller's RNG stream.
+# fit_mixture() runs once per sample, so seeding the global generator in place
+# would silently reset .Random.seed for the whole session on every call.
+draw_fit_indices <- function(n, size, seed) {
+  has.seed <- exists(".Random.seed", envir = globalenv(), inherits = FALSE)
+  if (has.seed) {
+    saved.seed <- get(".Random.seed", envir = globalenv(), inherits = FALSE)
+    on.exit(
+      assign(".Random.seed", saved.seed, envir = globalenv()),
+      add = TRUE
+    )
+  } else {
+    on.exit(
+      if (exists(".Random.seed", envir = globalenv(), inherits = FALSE)) {
+        rm(".Random.seed", envir = globalenv())
+      },
+      add = TRUE
     )
   }
-  invisible(mu)
+  set.seed(seed)
+  sample.int(n, size, replace = FALSE)
 }
 
-fitMixturePipeline <- function(
+fit_mixture <- function(
   beta,
   thresholds,
   nL,
@@ -384,41 +412,62 @@ fitMixturePipeline <- function(
   tol,
   beta.maxit,
   beta.score.tol,
-  fit.policy,
   context,
   debug = FALSE,
-  seed = 1L,
-  mean.order = c("strict", "anchors")
+  seed = 1L
 ) {
-  mean.order <- match.arg(mean.order)
-
-  class0 <- classifyByThresholds(beta, thresholds)
-  w0 <- matrix(0, nrow = length(beta), ncol = nL)
-  w0[cbind(seq_along(beta), class0)] <- 1
-
-  set.seed(seed)
-  rand.idx <- sample.int(
+  rand.idx <- draw_fit_indices(
     length(beta),
     min(nfit, length(beta)),
-    replace = FALSE
+    seed
   )
 
-  initial.counts <- requireAllClasses(
-    class = max.col(w0[rand.idx, , drop = FALSE], ties.method = "first"),
+  initial.class <- class_by_thresh(beta[rand.idx], thresholds)
+
+  initial.counts <- require_all_classes(
+    class = initial.class,
     nL = nL,
     context = paste0(context, " initial mixture"),
     min.count = 2L
   )
 
+  # One-hot responsibilities for the fit subset only; allocating a full
+  # length(beta) x nL matrix and then keeping only sampled rows wastes memory
+  # proportional to the whole probe set.
+  w.init <- matrix(0, nrow = length(rand.idx), ncol = nL)
+  w.init[cbind(seq_along(rand.idx), initial.class)] <- 1
+
+  # Historical BMIQ clips endpoints to half the distance to the nearest
+  # interior observation. Guard the degenerate case where every fit value is
+  # 0 (or every value is 1) so min()/max() do not return +/-Inf, and floor the
+  # clips at endpoint.eps so a subnormal input cannot round the bound back to
+  # an exact 0 or 1 (which would feed log(0) into the mixture fit).
   y_fit <- as.numeric(beta[rand.idx])
-  y_min_pos <- min(y_fit[y_fit > 0])
-  y_max_lt1 <- max(y_fit[y_fit < 1])
-  y_fit <- pmax(y_fit, y_min_pos / 2)
-  y_fit <- pmin(y_fit, 1 - (1 - y_max_lt1) / 2)
+  endpoint.eps <- sqrt(.Machine$double.eps)
+  positive <- y_fit[y_fit > 0]
+  below.one <- y_fit[y_fit < 1]
+  lower.clip <- if (length(positive)) {
+    max(endpoint.eps, min(positive) / 2)
+  } else {
+    endpoint.eps
+  }
+  upper.clip <- if (length(below.one)) {
+    min(1 - endpoint.eps, 1 - (1 - max(below.one)) / 2)
+  } else {
+    1 - endpoint.eps
+  }
+  if (!(lower.clip < upper.clip)) {
+    stop(
+      context,
+      " could not construct a valid open-interval clipping range.",
+      call. = FALSE
+    )
+  }
+  y_fit <- pmin(upper.clip, pmax(lower.clip, y_fit))
 
   em <- beta_mixture_em_cpp(
     y = y_fit,
-    initial_responsibility = w0[rand.idx, , drop = FALSE],
+    initial_responsibility = w.init,
     nL = nL,
     maxiter = niter,
     tol = tol,
@@ -427,55 +476,25 @@ fitMixturePipeline <- function(
     debug = debug
   )
 
-  if (fit.policy != "usable") {
-    if (!isTRUE(em$converged) || any(em$fit_status != "converged")) {
-      stop(
-        context,
-        " mixture did not fully converge under fit.policy = \"converged\" ",
-        "(EM: ",
-        isTRUE(em$converged),
-        "; parameter_criterion: ",
-        if (!is.null(em$parameter_criterion)) {
-          signif(em$parameter_criterion, 8)
-        } else {
-          "NA"
-        },
-        "; loglik_criterion: ",
-        if (!is.null(em$loglik_criterion)) {
-          signif(em$loglik_criterion, 8)
-        } else {
-          "NA"
-        },
-        "; components: ",
-        paste(em$fit_status, collapse = ", "),
-        ").",
-        call. = FALSE
-      )
-    }
-  }
-
-  component.means <- as.numeric(em$mu[, 1L])
-  if (mean.order == "strict") {
-    requireOrderedComponentMeans(
-      component.means,
-      paste0(context, " mixture")
-    )
-  } else {
-    requireOrderedAnchors(
-      component.means,
-      paste0(context, " mixture")
-    )
-  }
-
-  subset.class <- max.col(em$w, ties.method = "first")
-  subset.counts <- requireAllClasses(
-    class = subset.class,
-    nL = nL,
-    context = paste0(context, " posterior mixture"),
-    min.count = 1L
+  em <- canonicalize_em_components(
+    em,
+    paste0(context, " mixture")
   )
 
-  posterior.thresholds <- thresholdsFromDensityCrossings(
+  # Components are already canonicalized by increasing mean.
+  component.means <- as.numeric(em$mu[, 1L])
+
+  # Diagnostic only: a valid soft component may never win the hard posterior
+  # assignment, so do not reject on it. The load-bearing class checks are the
+  # initial-count check above and the complete threshold-class check below.
+  subset.class <- max.col(em$w, ties.method = "first")
+  subset.counts <- tabulate(subset.class, nbins = nL)
+
+  # The responsibility matrix is not returned in diagnostics and is only used
+  # for the counts above; drop it so it is not carried for the whole run.
+  em$w <- NULL
+
+  posterior.thresholds <- density_thresholds(
     a = as.numeric(em$a[, 1L]),
     b = as.numeric(em$b[, 1L]),
     eta = as.numeric(em$eta),
@@ -483,12 +502,12 @@ fitMixturePipeline <- function(
     context = paste0(context, " posterior mixture")
   )
 
-  full.class <- classifyByThresholds(
+  full.class <- class_by_thresh(
     beta = beta,
     thresholds = posterior.thresholds
   )
 
-  full.counts <- requireAllClasses(
+  full.counts <- require_all_classes(
     class = full.class,
     nL = nL,
     context = paste0(context, " complete mixture"),
@@ -507,7 +526,7 @@ fitMixturePipeline <- function(
   )
 }
 
-collectEmDiagnostics <- function(fit, extra = NULL) {
+em_diagnostics <- function(fit, extra = NULL) {
   em <- fit$em
   out <- list(
     random_indices = fit$random_indices,
@@ -539,7 +558,7 @@ collectEmDiagnostics <- function(fit, extra = NULL) {
   out
 }
 
-mapBetaQuantile <- function(x, a.sample, b.sample, a.gold, b.gold, lower.tail) {
+map_beta_q <- function(x, a.sample, b.sample, a.gold, b.gold, lower.tail) {
   qbeta(
     pbeta(x, a.sample, b.sample, lower.tail = lower.tail),
     a.gold,
@@ -550,33 +569,40 @@ mapBetaQuantile <- function(x, a.sample, b.sample, a.gold, b.gold, lower.tail) {
 
 #' Calibrate Methylation Beta Values Against a Gold Standard
 #'
-#' Adjust DNA methylation beta values so each sample matches a gold-standard
-#' beta profile using beta-mixture quantile (BMIQ) normalization.
+#' BMIQ-style calibration of DNA methylation beta values to a gold-standard
+#' beta profile (beta-mixture quantile mapping). Provided for pipelines that
+#' require this procedure; defaults target legacy BMIQ compatibility.
 #'
 #' @param datM Numeric matrix of beta values: samples in rows, CpGs in
 #'   columns. Values must be finite, non-missing, and in \eqn{[0, 1]}.
 #' @param goldstandard.beta Numeric vector of gold-standard betas, one per
 #'   column of `datM`.
 #' @param nL Number of mixture components: `3` for unmethylated /
-#'   intermediate / methylated (default), or `2` for unmethylated /
-#'   methylated only.
+#'   intermediate / methylated (default, legacy three-state BMIQ), or `2`
+#'   for unmethylated / methylated only. Choose `nL` by whether the
+#'   intermediate component is scientifically appropriate for your data,
+#'   not as a convergence setting: either model can be run further toward
+#'   convergence by raising `niter` (see below). Using two components is not
+#'   a mathematical substitute for converging a three-component model.
 #' @param doH Whether to normalize the intermediate (H) component.
 #'   Default is `TRUE` when `nL = 3` and `FALSE` when `nL = 2`.
 #' @param nfit Maximum number of probes used when fitting each mixture.
 #' @param th1.v Initial gold-standard class boundaries (length `nL - 1`).
 #'   Defaults to `c(0.2, 0.75)` for `nL = 3` and `0.5` for `nL = 2`.
 #' @param niter Maximum outer EM iterations for the gold-standard fit and
-#'   each sample fit (same as legacy).
+#'   each sample fit. Default `5` is a legacy-compatibility setting matching
+#'   common three-state BMIQ pipelines. Raising `niter` above `5` with
+#'   `nL = 3` warns only that results will no longer match legacy
+#'   five-iteration output; running a three-component fit further toward
+#'   convergence is otherwise a valid choice.
 #' @param tol Convergence tolerance for the mixture fit.
 #' @param beta.maxit Maximum iterations for each Beta-component fit.
 #' @param beta.score.tol Convergence tolerance for each Beta-component fit.
-#' @param fit.policy How strict mixture convergence must be.
-#'   * `"usable"` (default): accept finite component fits even if not fully
-#'     converged.
-#'   * `"converged"`: require full mixture and component convergence.
 #' @param h.policy What to do if intermediate (H) normalization fails when
 #'   `doH = TRUE`.
-#'   * `"optional"` (default): keep U/M calibration for that sample.
+#'   * `"optional"` (default): keep the U-plus-upper-M calibration for that
+#'     sample (lower-M observations, normally absorbed into the H map, are
+#'     left unchanged).
 #'   * `"require"`: treat the sample as failed.
 #' @param on.sample.error What to do when a sample fails.
 #'   * `"stop"` (default): abort.
@@ -602,9 +628,25 @@ mapBetaQuantile <- function(x, a.sample, b.sample, a.gold, b.gold, lower.tail) {
 #' summary.
 #'
 #' @details
+#' **Choosing `nL` and `niter` are independent decisions.** `nL` is a
+#' modeling choice (is an intermediate component appropriate?); `niter` is a
+#' stopping choice (how far to run EM). The `nL = 3`, `niter = 5` default is
+#' the intentional legacy configuration for clock-style and other pipelines
+#' that expect historical BMIQ behavior: the five-iteration cap is a
+#' compatibility choice, not a claim of statistical convergence. Either the
+#' two- or three-component model can be run further toward convergence by
+#' raising `niter`; with `nL = 3` this emits a warning only because the output
+#' then departs from legacy five-iteration results. Component fits are always
+#' accepted when finite (the mixture is fit with a generalized-EM ascent guard
+#' so accepting an unconverged component cannot decrease the log-likelihood);
+#' per-component convergence status is reported in `diagnostics` when
+#' `debug = TRUE`.
+#'
 #' With `nL = 3`, samples are fit as unmethylated (U), intermediate (H), and
 #' methylated (M) components, then quantile-normalized to the gold standard
-#' (with continuous H stitching when H runs).
+#' (with continuous H stitching when H runs). When H is skipped
+#' (`h.policy = "optional"`), U and the upper-M tail are calibrated and
+#' lower-M observations are left unchanged, matching legacy BMIQ.
 #'
 #' With `nL = 2`, only U and M are used (no H step). Normalization uses
 #' truncated component quantile maps joined at the gold U/M threshold so both
@@ -639,7 +681,6 @@ bmiq_calibration <- function(
   tol = 0.001,
   beta.maxit = 50L,
   beta.score.tol = 1e-10,
-  fit.policy = c("usable", "converged"),
   h.policy = c("optional", "require"),
   on.sample.error = c("stop", "continue"),
   failed.sample = c("NA", "original"),
@@ -648,7 +689,6 @@ bmiq_calibration <- function(
 ) {
   call <- match.call()
 
-  fit.policy <- match.arg(fit.policy)
   h.policy <- match.arg(h.policy)
   on.sample.error <- match.arg(on.sample.error)
   failed.sample <- match.arg(failed.sample)
@@ -697,7 +737,16 @@ bmiq_calibration <- function(
   checkmate::assert_number(beta.score.tol, lower = 0, finite = TRUE)
   checkmate::assert_true(beta.score.tol > 0, .var.name = "beta.score.tol")
 
-  validateThresholds(
+  if (nL == 3L && niter > 5L) {
+    warning(
+      "nL = 3 with niter > 5 is not exactly compatible with legacy ",
+      "five-iteration BMIQ results. This is expected if you intentionally ",
+      "want the three-component fit to run further toward convergence.",
+      call. = FALSE
+    )
+  }
+
+  check_thresholds(
     th1.v,
     nL = nL,
     name = "th1.v",
@@ -730,8 +779,15 @@ bmiq_calibration <- function(
     sample.names <- rep.int("", number.of.samples)
   }
 
-  original.datM <- datM
-  calibrated <- datM
+  # Freshly allocated output so the C++ block scatter can mutate it in place
+  # without ever touching the caller's datM (copy-on-write would otherwise make
+  # the first write allocate a full-size copy anyway).
+  calibrated <- matrix(
+    NA_real_,
+    nrow = number.of.samples,
+    ncol = number.of.probes,
+    dimnames = dimnames(datM)
+  )
 
   success <- rep.int(FALSE, number.of.samples)
   h.applied.vec <- rep(NA, number.of.samples)
@@ -749,7 +805,7 @@ bmiq_calibration <- function(
     message("Fitting EM beta mixture to gold-standard probes")
   }
 
-  gold.fit <- fitMixturePipeline(
+  gold.fit <- fit_mixture(
     beta = beta1.v,
     thresholds = th1.v,
     nL = nL,
@@ -758,7 +814,6 @@ bmiq_calibration <- function(
     tol = tol,
     beta.maxit = beta.maxit,
     beta.score.tol = beta.score.tol,
-    fit.policy = fit.policy,
     context = "Gold-standard",
     debug = debug
   )
@@ -766,17 +821,23 @@ bmiq_calibration <- function(
   em1.o <- gold.fit$em
   nth1.v <- gold.fit$thresholds
 
-  mod1U <- estimateMode(
+  # Hoist the gold-standard shapes and thresholds out of the per-sample loop;
+  # they are constant across samples.
+  gold.a <- as.numeric(em1.o$a[, 1L])
+  gold.b <- as.numeric(em1.o$b[, 1L])
+  gold.thresholds <- as.numeric(nth1.v)
+
+  mod1U <- estimate_mode(
     beta1.v[gold.fit$full_class == 1L],
     "Gold-standard unmethylated class"
   )
-  mod1M <- estimateMode(
+  mod1M <- estimate_mode(
     beta1.v[gold.fit$full_class == nL],
     "Gold-standard methylated class"
   )
 
   gold.diagnostics <- if (debug) {
-    collectEmDiagnostics(
+    em_diagnostics(
       gold.fit,
       extra = list(
         unmethylated_mode = mod1U,
@@ -791,8 +852,8 @@ bmiq_calibration <- function(
     message("Gold-standard mixture fit complete")
   }
 
-  processOneSample <- function(ii) {
-    beta2.v <- as.numeric(original.datM[ii, ])
+  process_sample <- function(ii, beta2.v) {
+    beta2.v <- as.numeric(beta2.v)
     sample.name <- sample.names[ii]
     stage <- "initialization"
 
@@ -813,12 +874,12 @@ bmiq_calibration <- function(
         low.mode.values <- beta2.v[beta2.v < 0.4]
         high.mode.values <- beta2.v[beta2.v > 0.6]
 
-        mod2U <- estimateMode(
+        mod2U <- estimate_mode(
           low.mode.values,
           paste0("Sample ", ii, " values below 0.4")
         )
 
-        mod2M <- estimateMode(
+        mod2M <- estimate_mode(
           high.mode.values,
           paste0("Sample ", ii, " values above 0.6")
         )
@@ -841,15 +902,20 @@ bmiq_calibration <- function(
         # nL = 2: average of the two anchor shifts on the single U/M cut.
         if (nL == 3L) {
           th2.initial <- c(
-            nth1.v[1L] + unmethylated.shift,
-            nth1.v[2L] + methylated.shift
+            gold.thresholds[1L] + unmethylated.shift,
+            gold.thresholds[2L] + methylated.shift
           )
         } else {
-          th2.initial <- nth1.v[1L] +
+          th2.initial <- gold.thresholds[1L] +
             0.5 * (unmethylated.shift + methylated.shift)
         }
 
-        validateThresholds(
+        # These are only EM initialization cuts, not fitted component-specific
+        # roots, so sorting mode-shifted boundaries that cross is safe. (Never
+        # sort fitted posterior thresholds.)
+        th2.initial <- sort(th2.initial)
+
+        check_thresholds(
           th2.initial,
           nL = nL,
           name = paste0("Sample ", ii, " initial thresholds"),
@@ -864,7 +930,7 @@ bmiq_calibration <- function(
 
         stage <- "sample mixture fitting"
 
-        sample.fit <- fitMixturePipeline(
+        sample.fit <- fit_mixture(
           beta = beta2.v,
           thresholds = th2.initial,
           nL = nL,
@@ -873,10 +939,8 @@ bmiq_calibration <- function(
           tol = tol,
           beta.maxit = beta.maxit,
           beta.score.tol = beta.score.tol,
-          fit.policy = fit.policy,
           context = paste0("Sample ", ii),
-          debug = debug,
-          mean.order = "anchors"
+          debug = debug
         )
 
         em2.o <- sample.fit$em
@@ -886,7 +950,7 @@ bmiq_calibration <- function(
         if (debug) {
           diagnostic <- modifyList(
             diagnostic,
-            collectEmDiagnostics(sample.fit)
+            em_diagnostics(sample.fit)
           )
           diagnostic$posterior_thresholds <- sample.fit$thresholds
         }
@@ -895,47 +959,49 @@ bmiq_calibration <- function(
 
         U <- 1L
         M <- nL
+        # Assign every U/M observation to exactly one tail; values exactly at
+        # a component mean must not be left unnormalized.
         selU.idx <- which(class2.v == U)
-        selUL.idx <- selU.idx[beta2.v[selU.idx] < classAV2.v[U]]
+        selUL.idx <- selU.idx[beta2.v[selU.idx] <= classAV2.v[U]]
         selUR.idx <- selU.idx[beta2.v[selU.idx] > classAV2.v[U]]
         selM.idx <- which(class2.v == M)
         selML.idx <- selM.idx[beta2.v[selM.idx] < classAV2.v[M]]
-        selMR.idx <- selM.idx[beta2.v[selM.idx] > classAV2.v[M]]
+        selMR.idx <- selM.idx[beta2.v[selM.idx] >= classAV2.v[M]]
 
         if (nL == 2L) {
           stage <- "nL=2 truncated U/M quantile normalization"
-          nbeta2.v <- normalizeNL2Truncated(
+          nbeta2.v <- normalize_nl2(
             beta = beta2.v,
             class = class2.v,
             sample.a = as.numeric(em2.o$a[, 1L]),
             sample.b = as.numeric(em2.o$b[, 1L]),
-            gold.a = as.numeric(em1.o$a[, 1L]),
-            gold.b = as.numeric(em1.o$b[, 1L]),
+            gold.a = gold.a,
+            gold.b = gold.b,
             sample.threshold = sample.fit$thresholds[1L],
-            gold.threshold = nth1.v[1L],
+            gold.threshold = gold.thresholds[1L],
             context = paste0("Sample ", ii, " nL=2 map")
           )
           if (debug) {
             diagnostic$nl2_sample_threshold <- sample.fit$thresholds[1L]
-            diagnostic$nl2_gold_threshold <- nth1.v[1L]
+            diagnostic$nl2_gold_threshold <- gold.thresholds[1L]
           }
         } else {
           stage <- "unmethylated quantile normalization"
 
           if (length(selUL.idx)) {
-            nbeta2.v[selUL.idx] <- mapBetaQuantile(
+            nbeta2.v[selUL.idx] <- map_beta_q(
               beta2.v[selUL.idx],
               em2.o$a[U, 1L], em2.o$b[U, 1L],
-              em1.o$a[U, 1L], em1.o$b[U, 1L],
+              gold.a[U], gold.b[U],
               lower.tail = TRUE
             )
           }
 
           if (length(selUR.idx)) {
-            nbeta2.v[selUR.idx] <- mapBetaQuantile(
+            nbeta2.v[selUR.idx] <- map_beta_q(
               beta2.v[selUR.idx],
               em2.o$a[U, 1L], em2.o$b[U, 1L],
-              em1.o$a[U, 1L], em1.o$b[U, 1L],
+              gold.a[U], gold.b[U],
               lower.tail = FALSE
             )
           }
@@ -943,10 +1009,10 @@ bmiq_calibration <- function(
           stage <- "methylated quantile normalization"
 
           if (length(selMR.idx)) {
-            nbeta2.v[selMR.idx] <- mapBetaQuantile(
+            nbeta2.v[selMR.idx] <- map_beta_q(
               beta2.v[selMR.idx],
               em2.o$a[M, 1L], em2.o$b[M, 1L],
-              em1.o$a[M, 1L], em1.o$b[M, 1L],
+              gold.a[M], gold.b[M],
               lower.tail = FALSE
             )
           }
@@ -967,11 +1033,8 @@ bmiq_calibration <- function(
             {
               stage <- "intermediate/H normalization"
 
-              requireOrderedComponentMeans(
-                classAV2.v,
-                paste0("Sample ", ii, " mixture (H)")
-              )
-
+              # Component means are canonicalized in fit_mixture(), so no
+              # separate ordering check is needed here.
               if (!length(selMR.idx)) {
                 stop(
                   "H normalization needs methylated probes above the ",
@@ -1032,7 +1095,7 @@ bmiq_calibration <- function(
                 ii,
                 " (",
                 conditionMessage(h.attempt),
-                "); U/M-only calibration."
+                "); U plus upper-M calibration (lower-M left unchanged)."
               )
             }
             if (debug) {
@@ -1112,64 +1175,91 @@ bmiq_calibration <- function(
     )
   }
 
-  for (ii in seq_len(number.of.samples)) {
-    if (verbose) {
-      message(
-        "Processing sample ",
-        ii,
-        " of ",
-        number.of.samples,
-        if (nzchar(sample.names[ii])) {
-          paste0(" (", sample.names[ii], ")")
-        } else {
-          ""
-        }
-      )
-    }
+  # Samples are rows in a column-major matrix, so a single sample is strided
+  # across memory. Gather a contiguous run of samples into a probes x block
+  # matrix (each sample contiguous), process the block, then scatter it back
+  # into the freshly allocated output. Eight doubles is one 64-byte cache line.
+  sample.block.size <- 8L
 
-    attempt <- tryCatch(
-      processOneSample(ii),
-      bmiq_sample_error = function(error) error
+  for (block.start in seq.int(1L, number.of.samples, by = sample.block.size)) {
+    block.count <- min(
+      sample.block.size,
+      number.of.samples - block.start + 1L
     )
 
-    if (inherits(attempt, "bmiq_sample_error")) {
-      if (on.sample.error == "stop") {
-        stop(attempt)
+    block <- gather_sample_block_cpp(
+      datM,
+      first_sample = block.start,
+      sample_count = block.count
+    )
+
+    for (local.sample in seq_len(block.count)) {
+      ii <- block.start + local.sample - 1L
+
+      if (verbose) {
+        message(
+          "Processing sample ",
+          ii,
+          " of ",
+          number.of.samples,
+          if (nzchar(sample.names[ii])) {
+            paste0(" (", sample.names[ii], ")")
+          } else {
+            ""
+          }
+        )
       }
 
-      success[ii] <- FALSE
-
-      if (failed.sample == "NA") {
-        calibrated[ii, ] <- NA_real_
-      } else {
-        calibrated[ii, ] <- original.datM[ii, ]
-      }
-
-      failures[[length(failures) + 1L]] <- data.frame(
-        sample_index = attempt$sample.index,
-        sample_name = attempt$sample.name,
-        stage = attempt$stage,
-        message = attempt$original.message,
-        stringsAsFactors = FALSE
+      attempt <- tryCatch(
+        process_sample(ii, block[, local.sample]),
+        bmiq_sample_error = function(error) error
       )
 
-      if (debug) {
-        sample.diagnostics[[ii]] <-
-          attempt$diagnostics
+      if (inherits(attempt, "bmiq_sample_error")) {
+        if (on.sample.error == "stop") {
+          stop(attempt)
+        }
+
+        success[ii] <- FALSE
+
+        if (failed.sample == "NA") {
+          block[, local.sample] <- NA_real_
+        }
+        # failed.sample == "original": leave the gathered originals in place.
+
+        failures[[length(failures) + 1L]] <- data.frame(
+          sample_index = attempt$sample.index,
+          sample_name = attempt$sample.name,
+          stage = attempt$stage,
+          message = attempt$original.message,
+          stringsAsFactors = FALSE
+        )
+
+        if (debug) {
+          sample.diagnostics[[ii]] <- attempt$diagnostics
+        }
+
+        next
       }
 
-      next
+      block[, local.sample] <- attempt$beta
+      success[ii] <- TRUE
+      if (doH) {
+        h.applied.vec[ii] <- attempt$h_applied
+      }
+
+      if (debug) {
+        sample.diagnostics[[ii]] <- attempt$diagnostics
+      }
     }
 
-    calibrated[ii, ] <- attempt$beta
-    success[ii] <- TRUE
-    if (doH) {
-      h.applied.vec[ii] <- attempt$h_applied
-    }
+    scatter_sample_block_cpp(
+      destination = calibrated,
+      block = block,
+      first_sample = block.start
+    )
 
-    if (debug) {
-      sample.diagnostics[[ii]] <- attempt$diagnostics
-    }
+    rm(block)
   }
 
   if (length(failures)) {
@@ -1201,7 +1291,7 @@ bmiq_calibration <- function(
   if (length(skipped.h)) {
     warning(
       length(skipped.h),
-      " sample(s) calibrated without H (U/M-only). ",
+      " sample(s) calibrated without H (U plus upper-M). ",
       "See result$h.applied.",
       call. = FALSE
     )
@@ -1231,7 +1321,6 @@ bmiq_calibration <- function(
       tol = tol,
       beta.maxit = beta.maxit,
       beta.score.tol = beta.score.tol,
-      fit.policy = fit.policy,
       h.policy = h.policy,
       on.sample.error = on.sample.error,
       failed.sample = failed.sample,
@@ -1258,7 +1347,7 @@ print.bmiq_calibration_result <- function(x, ...) {
   cat("  Succeeded: ", number.succeeded, "\n", sep = "")
   cat("  Failed:    ", number.failed, "\n", sep = "")
   if (isTRUE(x$settings$doH)) {
-    cat("  H skipped: ", number.h.skipped, " (U/M-only)\n", sep = "")
+    cat("  H skipped: ", number.h.skipped, " (U plus upper-M)\n", sep = "")
   }
 
   if (number.failed) {

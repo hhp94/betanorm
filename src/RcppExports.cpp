@@ -13,7 +13,7 @@ Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 
 // scan_finite_unit_interval_cpp
 void scan_finite_unit_interval_cpp(const arma::mat& x, std::string name, bool require_open);
-RcppExport SEXP _bmiqpp_scan_finite_unit_interval_cpp(SEXP xSEXP, SEXP nameSEXP, SEXP require_openSEXP) {
+RcppExport SEXP _betanorm_scan_finite_unit_interval_cpp(SEXP xSEXP, SEXP nameSEXP, SEXP require_openSEXP) {
 BEGIN_RCPP
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const arma::mat& >::type x(xSEXP);
@@ -23,9 +23,34 @@ BEGIN_RCPP
     return R_NilValue;
 END_RCPP
 }
+// gather_sample_block_cpp
+Rcpp::NumericMatrix gather_sample_block_cpp(const Rcpp::NumericMatrix& x, int first_sample, int sample_count);
+RcppExport SEXP _betanorm_gather_sample_block_cpp(SEXP xSEXP, SEXP first_sampleSEXP, SEXP sample_countSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::NumericMatrix& >::type x(xSEXP);
+    Rcpp::traits::input_parameter< int >::type first_sample(first_sampleSEXP);
+    Rcpp::traits::input_parameter< int >::type sample_count(sample_countSEXP);
+    rcpp_result_gen = Rcpp::wrap(gather_sample_block_cpp(x, first_sample, sample_count));
+    return rcpp_result_gen;
+END_RCPP
+}
+// scatter_sample_block_cpp
+void scatter_sample_block_cpp(Rcpp::NumericMatrix destination, const Rcpp::NumericMatrix& block, int first_sample);
+RcppExport SEXP _betanorm_scatter_sample_block_cpp(SEXP destinationSEXP, SEXP blockSEXP, SEXP first_sampleSEXP) {
+BEGIN_RCPP
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::NumericMatrix >::type destination(destinationSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::NumericMatrix& >::type block(blockSEXP);
+    Rcpp::traits::input_parameter< int >::type first_sample(first_sampleSEXP);
+    scatter_sample_block_cpp(destination, block, first_sample);
+    return R_NilValue;
+END_RCPP
+}
 // beta_mixture_em_cpp
 Rcpp::List beta_mixture_em_cpp(const arma::vec& y, const arma::mat& initial_responsibility, int nL, int maxiter, double tol, int beta_maxit, int beta_max_halving, double beta_score_tol, double min_shape, double armijo, bool debug);
-RcppExport SEXP _bmiqpp_beta_mixture_em_cpp(SEXP ySEXP, SEXP initial_responsibilitySEXP, SEXP nLSEXP, SEXP maxiterSEXP, SEXP tolSEXP, SEXP beta_maxitSEXP, SEXP beta_max_halvingSEXP, SEXP beta_score_tolSEXP, SEXP min_shapeSEXP, SEXP armijoSEXP, SEXP debugSEXP) {
+RcppExport SEXP _betanorm_beta_mixture_em_cpp(SEXP ySEXP, SEXP initial_responsibilitySEXP, SEXP nLSEXP, SEXP maxiterSEXP, SEXP tolSEXP, SEXP beta_maxitSEXP, SEXP beta_max_halvingSEXP, SEXP beta_score_tolSEXP, SEXP min_shapeSEXP, SEXP armijoSEXP, SEXP debugSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -46,7 +71,7 @@ END_RCPP
 }
 // qnorm_target_rows_cpp
 Rcpp::NumericMatrix qnorm_target_rows_cpp(const Rcpp::NumericMatrix& obj, const Rcpp::NumericVector& target);
-RcppExport SEXP _bmiqpp_qnorm_target_rows_cpp(SEXP objSEXP, SEXP targetSEXP) {
+RcppExport SEXP _betanorm_qnorm_target_rows_cpp(SEXP objSEXP, SEXP targetSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -58,13 +83,15 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_bmiqpp_scan_finite_unit_interval_cpp", (DL_FUNC) &_bmiqpp_scan_finite_unit_interval_cpp, 3},
-    {"_bmiqpp_beta_mixture_em_cpp", (DL_FUNC) &_bmiqpp_beta_mixture_em_cpp, 11},
-    {"_bmiqpp_qnorm_target_rows_cpp", (DL_FUNC) &_bmiqpp_qnorm_target_rows_cpp, 2},
+    {"_betanorm_scan_finite_unit_interval_cpp", (DL_FUNC) &_betanorm_scan_finite_unit_interval_cpp, 3},
+    {"_betanorm_gather_sample_block_cpp", (DL_FUNC) &_betanorm_gather_sample_block_cpp, 3},
+    {"_betanorm_scatter_sample_block_cpp", (DL_FUNC) &_betanorm_scatter_sample_block_cpp, 3},
+    {"_betanorm_beta_mixture_em_cpp", (DL_FUNC) &_betanorm_beta_mixture_em_cpp, 11},
+    {"_betanorm_qnorm_target_rows_cpp", (DL_FUNC) &_betanorm_qnorm_target_rows_cpp, 2},
     {NULL, NULL, 0}
 };
 
-RcppExport void R_init_bmiqpp(DllInfo *dll) {
+RcppExport void R_init_betanorm(DllInfo *dll) {
     R_registerRoutines(dll, NULL, CallEntries, NULL, NULL);
     R_useDynamicSymbols(dll, FALSE);
 }

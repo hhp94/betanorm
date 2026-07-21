@@ -7,6 +7,6 @@
 # * https://testthat.r-lib.org/articles/special-files.html
 
 library(testthat)
-library(bmiqpp)
+library(betanorm)
 
-test_check("bmiqpp")
+test_check("betanorm")

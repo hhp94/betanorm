@@ -19,7 +19,7 @@ source("dev/bmiq-calibration-legacy.R", local = TRUE)
 data("GPL21145_sample", envir = environment())
 data("horvath_goldstandard", envir = environment())
 
-sample_i <- 5L
+sample_i <- 1L
 stopifnot(sample_i >= 1L, sample_i <= nrow(GPL21145_sample))
 
 probe_names <- colnames(GPL21145_sample)

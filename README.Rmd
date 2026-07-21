@@ -13,37 +13,62 @@ knitr::opts_chunk$set(
 )
 ```
 
-# bmiqpp
+# betanorm
 
 <!-- badges: start -->
 <!-- badges: end -->
 
-**bmiqpp** provides fast beta-mixture quantile (BMIQ) calibration of DNA
-methylation beta values against a gold-standard profile. Mixture component
-parameters are estimated with a Newton–Raphson procedure and step-halving,
-implemented in C++ via [Rcpp](https://cran.r-project.org/package=Rcpp) and
-[RcppArmadillo](https://cran.r-project.org/package=RcppArmadillo).
+**betanorm** is a small toolkit of fast C++ array-normalization utilities
+([Rcpp](https://cran.r-project.org/package=Rcpp) /
+[RcppArmadillo](https://cran.r-project.org/package=RcppArmadillo)):
 
-The package also includes a small quantile-normalization helper that maps each
-sample row onto a target distribution (no missing values).
+- **Quantile normalization** — map each sample row onto a target distribution
+  (no missing values; a focused port of
+  `preprocessCore::normalize.quantiles.use.target()`).
+- **BMIQ-style gold-standard calibration** — for DNA methylation beta matrices
+  when a pipeline expects beta-mixture quantile calibration to a reference
+  profile. The default path (`nL = 3`, `niter = 5`) is intentionally
+  legacy-compatible, not a claim that five outer EM steps are statistical
+  convergence.
 
 ## Installation
 
-Install the development version from [GitHub](https://github.com/hhp94/bmiqpp):
+Install the development version from [GitHub](https://github.com/hhp94/betanorm):
 
 ``` r
 # install.packages("pak")
-pak::pak("hhp94/bmiqpp")
+pak::pak("hhp94/betanorm")
 ```
 
-## Quick start
+## Quantile normalization
 
-Load the package and the built-in example data: a gold-standard annotation
-table and a small beta matrix (6 samples × ~21k probes).
+`quantile_norm()` maps each matrix row onto a target vector by rank: equal
+length uses Bolstad-style indexing; unequal length uses linear quantile
+interpolation. Inputs must be finite with no missing values.
 
 ```{r setup}
-library(bmiqpp)
+library(betanorm)
+```
 
+```{r quantile-norm}
+set.seed(1)
+X <- matrix(rnorm(5 * 100), nrow = 5)
+target <- sort(rnorm(100))
+Y <- quantile_norm(X, target)
+dim(Y)
+```
+
+## Gold-standard calibration (BMIQ-style)
+
+For methylation betas, `bmiq_calibration()` fits a two- or three-component
+beta mixture per sample and maps components toward a gold-standard profile.
+Use this when you need that procedure (e.g. clock-style workflows); prefer
+`quantile_norm()` when a plain target distribution is enough.
+
+Built-in example data: gold-standard annotation and a small beta matrix
+(6 samples × ~21k probes).
+
+```{r bmiq-data}
 data(horvath_goldstandard)
 data(GPL21145_sample)
 
@@ -51,9 +76,17 @@ dim(GPL21145_sample)
 head(horvath_goldstandard$goldstandard2, 3)
 ```
 
-Calibrate samples to the gold-standard mean betas. By default this uses a
-**three-component** mixture (unmethylated / intermediate / methylated) with
-outer EM iterations `niter = 5`.
+### Legacy defaults (`nL = 3`, `niter = 5`)
+
+Three-state BMIQ with a hard outer EM cap of **five** iterations is the
+intentional default. That pair reproduces common legacy implementations
+(Horvath-style / MEAT-style clocks and similar pipelines). **Do not raise
+`niter` on the `nL = 3` path** unless you deliberately want results that
+diverge from those implementations—`bmiq_calibration()` warns if you do.
+
+If you want the mixture EM to run longer or toward convergence, switch to
+**`nL = 2`** (U/M only; no intermediate H step) and raise `niter` / tighten
+`fit.policy` there instead.
 
 ```{r calibrate}
 fit <- bmiq_calibration(
@@ -67,16 +100,18 @@ calibrated <- as.matrix(fit)
 dim(calibrated)
 ```
 
-### Two-component mixtures
+### Two-component path (`nL = 2`)
 
-Set `nL = 2` for unmethylated / methylated only (no intermediate H step). In
-that mode `doH` defaults to `FALSE`.
+Use `nL = 2` for unmethylated / methylated only (`doH` defaults to `FALSE`)
+and whenever you prefer longer EM rather than the legacy five-iteration
+three-state cap.
 
 ```{r calibrate-nl2}
 fit2 <- bmiq_calibration(
   datM = GPL21145_sample,
   goldstandard.beta = horvath_goldstandard$goldstandard2,
   nL = 2L,
+  niter = 25L,
   verbose = FALSE
 )
 fit2
@@ -91,44 +126,30 @@ fit <- bmiq_calibration(
   datM = datM,
   goldstandard.beta = gold,
   on.sample.error = "continue",
-  failed.sample = "NA",      # or "original"
-  h.policy = "optional",     # keep U/M if H fails
-  fit.policy = "usable"      # accept finite (not fully converged) fits
+  failed.sample = "NA", # or "original"
+  h.policy = "optional", # keep U/M if H fails
+  fit.policy = "usable" # accept finite (not fully converged) fits
 )
-```
-
-## Quantile normalization
-
-`quantile_norm()` is a minimal, no-missing-data port of
-`preprocessCore::normalize.quantiles.use.target()`. Each row is ranked and
-mapped onto a target vector.
-
-```{r quantile-norm}
-set.seed(1)
-X <- matrix(rnorm(5 * 100), nrow = 5)
-target <- sort(rnorm(100))
-Y <- quantile_norm(X, target)
-dim(Y)
 ```
 
 ## Main functions
 
 | Function | Role |
 |----------|------|
-| `bmiq_calibration()` | BMIQ calibration to a gold-standard beta profile |
 | `quantile_norm()` | Quantile-normalize matrix rows to a target distribution |
+| `bmiq_calibration()` | BMIQ-style calibration to a gold-standard beta profile |
 | `horvath_goldstandard` | Gold-standard probe annotation + mean betas |
 | `GPL21145_sample` | Example beta matrix for demos and tests |
 
 ## References
+
+Bolstad BM, Irizarry RA, Åstrand M, Speed TP (2003). A comparison of
+normalization methods for high density oligonucleotide array data based on
+variance and bias. *Bioinformatics* 19(2), 185–193.
+<https://doi.org/10.1093/bioinformatics/19.2.185>
 
 Teschendorff AE, Marabita F, Lechner M, Bartlett T, Tegner J, Gomez-Cabrero D,
 Beck S (2013). A beta-mixture quantile normalization method for correcting
 probe design bias in Illumina Infinium 450 k DNA methylation data.
 *Bioinformatics* 29(2), 189–196.
 <https://doi.org/10.1093/bioinformatics/bts680>
-
-Bolstad BM, Irizarry RA, Åstrand M, Speed TP (2003). A comparison of
-normalization methods for high density oligonucleotide array data based on
-variance and bias. *Bioinformatics* 19(2), 185–193.
-<https://doi.org/10.1093/bioinformatics/19.2.185>
