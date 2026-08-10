@@ -498,6 +498,8 @@ Rcpp::List beta_mixture_em_cpp(
 
     std::vector<double> log_component(
         static_cast<std::size_t>(K), 0.0);
+    std::vector<double> exp_shifted(
+        static_cast<std::size_t>(K), 0.0);
     std::vector<double> log_prior(
         static_cast<std::size_t>(K), 0.0);
     std::vector<double> am1(
@@ -652,8 +654,9 @@ Rcpp::List beta_mixture_em_cpp(
 
             for (R_xlen_t k = 0; k < K; ++k)
             {
-                sum_exp +=
+                exp_shifted[k] =
                     std::exp(log_component[k] - maximum);
+                sum_exp += exp_shifted[k];
             }
 
             if (!(sum_exp > 0.0) ||
@@ -668,11 +671,16 @@ Rcpp::List beta_mixture_em_cpp(
 
             loglikelihood += log_mixture;
 
+            // Single-exp E-step: responsibilities reuse the max-shifted
+            // exponentials rather than re-exponentiating against log_mixture.
+            // Not bit-identical to the log-space form (see DECISIONS.md,
+            // single-exp adoption); snapshots pin the current numerics.
+            const double inv_sum = 1.0 / sum_exp;
+
             for (R_xlen_t k = 0; k < K; ++k)
             {
                 responsibility_ptr[i + n * k] =
-                    std::exp(
-                        log_component[k] - log_mixture);
+                    exp_shifted[k] * inv_sum;
             }
         }
 

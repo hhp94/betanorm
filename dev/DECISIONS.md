@@ -69,8 +69,9 @@ by default) so release builds carry zero overhead.
 
 - **`findInterval` for `class_by_thresh`**: tie-semantics risk vs snapshots;
   the loop runs at most twice (nL <= 3) and is already vectorized.
-- **Single-`exp` E-step** (`exp(a)/s` vs `exp(a - log s)`): last-ULP change,
-  breaks bit-exact snapshots.
+- **Single-`exp` E-step**: originally rejected here on an *assumed* ULP
+  break. Superseded — measured and adopted 2026-08-10; see the single-exp
+  entry below.
 - **Gather/scatter block machinery**: deliberate cache-layout optimization
   (samples are strided rows in a column-major matrix), documented and
   contract-tested; a flat `datM[ii, ]` loop is simpler but was kept out.
@@ -100,6 +101,33 @@ source), not extra safety:
   guard (all-0/1 fit subsets), `th2.initial` collapse on degenerate data,
   the +/-1e-12 output tolerance + clamp (H map ulp overshoot), and all
   statistical class-count / crossing checks.
+
+## 2026-08-10 — Single-exp E-step adopted (deliberate numerics change)
+
+Reverses the same-day rejection above, which assumed rather than measured
+the ULP impact. The E-step now reuses the max-shifted exponentials for the
+responsibilities — `w = exp(lc - max) * (1 / sum_exp)` — instead of
+re-exponentiating `exp(lc - (max + log(sum_exp)))`. Measured on a verbatim
+EM clone over an 80-config grid (nL 2/3 x n 5k/20k x maxiter 5/25 x
+10 seeds; `scratchpad/estep_variants.cpp` bench):
+
+- A single E-step pass differs by at most 1 ulp (2.2e-16 on
+  responsibilities in [0, 1]).
+- Through EM feedback: relative drift <= 8e-8 on shapes, <= 2e-9 on the
+  log-likelihood; zero outer iteration-count or convergence flips across
+  160 config-mode pairs.
+- Speed: E-step kernel 4.6 -> 2.7 ms per pass at n = 20k (1.7x); a full
+  EM call (niter = 5, nL = 3, n = 20k) 26 -> 16 ms. At clock scale the EM
+  is roughly a third of the ~0.09 s/sample budget, so this saves
+  ~10 ms/sample (~11% end-to-end); at 450k-probe scale the EM is only ~4%,
+  so the gain there is ~2%.
+
+Snapshots were regenerated in the same commit. Observed snapshot deltas:
+calibrated output moved <= 7e-10; borderline diagnostics can flip
+(inner-Newton `fit_status` converged <-> max_iter at the score_tol
+boundary; the near-degenerate nL = 2 EM fixture now converges 2 iterations
+earlier, `converged` FALSE -> TRUE). The 1e-12 exactness contract now pins
+the single-exp numerics.
 
 ## Legacy compatibility (predates this log; do not drift)
 
