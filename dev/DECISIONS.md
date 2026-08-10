@@ -129,6 +129,28 @@ boundary; the near-degenerate nL = 2 EM fixture now converges 2 iterations
 earlier, `converged` FALSE -> TRUE). The 1e-12 exactness contract now pins
 the single-exp numerics.
 
+## 2026-08-10 — Profile with an -O2 DLL; load_all() builds at -O0 by default
+
+pkgbuild (used by `devtools::load_all()`) injects `-g -O0` debug flags
+unless `options(pkg.build_extra_flags = FALSE)` is set. R's own compiled
+code (`qbeta`, `pbeta`) is always optimized, so profiles taken against a
+load_all DLL overstate the package-C++ share. Corrected 21k stage
+attribution with an -O2 DLL (40 samples, post single-exp):
+
+- 72 ms/sample total (was 85.5 measured against the -O0 DLL);
+- `map_beta_q` (qbeta+pbeta) **67.6%**, 3.65 us per probe eval,
+  ~12.9k evals/sample;
+- `fit_mixture` (EM + classing) **26.3%** (EM call itself 15.7 ms,
+  matching the -O2 sourceCpp clone used in the single-exp bench);
+- everything else 6.1%.
+
+Earlier entries' *shares* for the compiled layer ("EM ~a third at 21k",
+"~4% at 450k") were measured against -O0 DLLs and overstate the EM;
+their conclusions stand (qbeta dominates even more, not less). Any future
+profile or bench must set `options(pkg.build_extra_flags = FALSE)` and
+rebuild (`pkgbuild::clean_dll()`) first, or compare against
+`Rcpp::sourceCpp` output (which uses the standard -O2 Makeconf flags).
+
 ## Legacy compatibility (predates this log; do not drift)
 
 - `nL = 3`, `niter = 5` is the intentional legacy BMIQ configuration
