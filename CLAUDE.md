@@ -6,7 +6,8 @@ R package: BMIQ-style calibration of DNA methylation beta values
 
 Settled design decisions and their rationale live in `dev/DECISIONS.md` —
 read it before proposing a change it already covers; do not re-litigate
-those there without new evidence.
+those there without new evidence. Work in flight is tracked in
+`dev/to-do.md` — check it before starting or resuming a work thread.
 
 ## Invariants
 
