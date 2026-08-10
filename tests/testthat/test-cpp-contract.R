@@ -81,8 +81,18 @@ test_that("beta_mixture_em_cpp returns the documented scalar and status types", 
   expect_identical(
     names(fit),
     c(
-      "a", "b", "eta", "mu", "w", "llike", "iterations", "converged",
-      "parameter_criterion", "loglik_criterion", "fit_status", "fit_reason",
+      "a",
+      "b",
+      "eta",
+      "mu",
+      "w",
+      "llike",
+      "iterations",
+      "converged",
+      "parameter_criterion",
+      "loglik_criterion",
+      "fit_status",
+      "fit_reason",
       "nL"
     )
   )

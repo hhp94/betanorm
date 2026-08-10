@@ -51,20 +51,23 @@
 #'
 #' # Run clean_beta() to clean the beta-matrix
 #' GSE121961_SE_clean <- clean_beta(SE = GSE121961_SE, version = "MEAT2.0")
-clean_beta <- function(SE=NULL,
-                       version="MEAT2.0") {
-
+clean_beta <- function(SE = NULL, version = "MEAT2.0") {
   # Check whether SE is a SummarizedExperiment object
-  if (!is(SE, "SummarizedExperiment"))
+  if (!is(SE, "SummarizedExperiment")) {
     stop("Please make sure SE is a SummarizedExperiment object.")
+  }
 
   # Check that the beta-matrix is indeed called "beta"
-  if (names(assays(SE))!="beta")
-    stop("Please make sure that the beta-matrix stored in the assays component of SE is called beta.")
+  if (names(assays(SE)) != "beta") {
+    stop(
+      "Please make sure that the beta-matrix stored in the assays component of SE is called beta."
+    )
+  }
 
   # If beta is a matrix, convert to a data frame
-  if (is.matrix(assays(SE)$beta))
+  if (is.matrix(assays(SE)$beta)) {
     assays(SE)$beta <- as.data.frame(assays(SE)$beta)
+  }
 
   # Check beta has row names
   if (!str_detect(rownames(SE)[1], "cg")) {
@@ -72,58 +75,87 @@ clean_beta <- function(SE=NULL,
   }
 
   # Check version is correct
-  if (!version %in% c("MEAT","MEAT2.0")) {
-    stop("Please provide a valid version for the muscle clock. Set version to either MEAT or MEAT2.0")
+  if (!version %in% c("MEAT", "MEAT2.0")) {
+    stop(
+      "Please provide a valid version for the muscle clock. Set version to either MEAT or MEAT2.0"
+    )
   }
 
   # Reduce beta to the CpGs used to calibrate the methylation profiles
   message("-------------------Step 1-------------------------------")
   gold.mean.MEAT <- NULL
   gold.mean.MEAT2.0 <- NULL
-  if (version=="MEAT")
-  {
-    data("gold.mean.MEAT",envir = environment())
+  if (version == "MEAT") {
+    data("gold.mean.MEAT", envir = environment())
     gold.mean <- gold.mean.MEAT
-  }
-  else
-  {
-    data("gold.mean.MEAT2.0",envir = environment())
+  } else {
+    data("gold.mean.MEAT2.0", envir = environment())
     gold.mean <- gold.mean.MEAT2.0
   }
 
   CpGs <- as.character(gold.mean[, "CpGs"])
-  message(paste("Reducing your beta-matrix to the",length(CpGs),"CpGs used to calibrate methylation profiles in",version))
+  message(paste(
+    "Reducing your beta-matrix to the",
+    length(CpGs),
+    "CpGs used to calibrate methylation profiles in",
+    version
+  ))
 
   # Check that the beta-matrix row names contain the CpGs
   L <- length(intersect(CpGs, rownames(SE)))
-  message(paste("Your beta-matrix contains", L, "of the",length(CpGs),"CpGs needed to calibrate methylation profiles."))
+  message(paste(
+    "Your beta-matrix contains",
+    L,
+    "of the",
+    length(CpGs),
+    "CpGs needed to calibrate methylation profiles."
+  ))
 
   if (L < length(CpGs) * 0.9) {
-    message("Your beta-matrix is missing > 10% of the",length(CpGs),"CpGs needed to calibrate the methylation profiles.
-            Calibration may be off, which may impact the accuracy of epigenetic age estimation.")
+    message(
+      "Your beta-matrix is missing > 10% of the",
+      length(CpGs),
+      "CpGs needed to calibrate the methylation profiles.
+            Calibration may be off, which may impact the accuracy of epigenetic age estimation."
+    )
   }
 
-  SE2 <- SummarizedExperiment(assays=list(beta=assays(SE)$beta[CpGs, ]),
-                              colData=colData(SE))
+  SE2 <- SummarizedExperiment(
+    assays = list(beta = assays(SE)$beta[CpGs, ]),
+    colData = colData(SE)
+  )
 
   message("-------------------Step 2-------------------------------")
   message("Checking for missing values in the beta-matrix.")
   if (anyNA(assays(SE2)$beta)) {
     L_NA <- length(which(is.na(assays(SE2)$beta)))
     message(paste("Your beta-matrix contains", L_NA, "missing values."))
-    assays(SE2)$beta <- impute::impute.knn(as.matrix(assays(SE2)$beta), k = 5)$data
+    assays(SE2)$beta <- impute::impute.knn(
+      as.matrix(assays(SE2)$beta),
+      k = 5
+    )$data
   }
 
   message("-------------------Step 3-------------------------------")
   message("Checking for the presence of 0 and 1.")
   L0 <- length(which(assays(SE2)$beta == 0))
   L1 <- length(which(assays(SE2)$beta == 1))
-  message(paste("Your beta-matrix contains", L0, "0 values and", L1, "1 values."))
+  message(paste(
+    "Your beta-matrix contains",
+    L0,
+    "0 values and",
+    L1,
+    "1 values."
+  ))
   if (L0 > 0) {
-    assays(SE2)$beta[assays(SE2)$beta == 0] <- min(assays(SE2)$beta[assays(SE2)$beta != 0])
+    assays(SE2)$beta[assays(SE2)$beta == 0] <- min(assays(SE2)$beta[
+      assays(SE2)$beta != 0
+    ])
   }
   if (L1 > 0) {
-    assays(SE2)$beta[assays(SE2)$beta == 1] <- max(assays(SE2)$beta[assays(SE2)$beta != 1])
+    assays(SE2)$beta[assays(SE2)$beta == 1] <- max(assays(SE2)$beta[
+      assays(SE2)$beta != 1
+    ])
   }
   return(SE2)
 }

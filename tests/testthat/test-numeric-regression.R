@@ -98,7 +98,12 @@ test_that("EM log-likelihood is monotonically non-decreasing", {
 
     expect_true(
       all(diff(likelihoods) >= -1e-8),
-      info = paste("seed", seed, ":", paste(signif(likelihoods, 10), collapse = " "))
+      info = paste(
+        "seed",
+        seed,
+        ":",
+        paste(signif(likelihoods, 10), collapse = " ")
+      )
     )
   }
 })
@@ -157,7 +162,9 @@ test_that("bmiq_calibration handles multiple samples across gather/scatter block
   gold <- simulate_beta_mixture(n_probes, nL = 3L, seed = 500L)
   datM <- t(vapply(
     seq_len(n_samples),
-    function(i) clip01(simulate_beta_mixture(n_probes, nL = 3L, seed = 500L + i)),
+    function(i) {
+      clip01(simulate_beta_mixture(n_probes, nL = 3L, seed = 500L + i))
+    },
     numeric(n_probes)
   ))
   rownames(datM) <- paste0("s", seq_len(n_samples))

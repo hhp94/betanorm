@@ -79,87 +79,97 @@
 #' version = "MEAT2.0",
 #' age_col_name = "Age")
 #' colData(GSE121961_SE_epiage)
-epiage_estimation <- function(SE = NULL,
-                              version = "MEAT2.0",
-                              age_col_name = NULL) {
-
+epiage_estimation <- function(
+  SE = NULL,
+  version = "MEAT2.0",
+  age_col_name = NULL
+) {
   # Check whether SE is a SummarizedExperiment object
-  if (!is(SE, "SummarizedExperiment"))
+  if (!is(SE, "SummarizedExperiment")) {
     stop("Please make sure SE is a SummarizedExperiment object.")
+  }
 
   # Check that the beta-matrix is indeed called "beta"
-  if (names(assays(SE))!="beta")
-    stop("Please make sure that the beta-matrix stored in the assays component of SE is called beta.")
+  if (names(assays(SE)) != "beta") {
+    stop(
+      "Please make sure that the beta-matrix stored in the assays component of SE is called beta."
+    )
+  }
 
   # Check version is correct
-  if (!version %in% c("MEAT","MEAT2.0")) {
-    stop("Please provide a valid version for the muscle clock. Set version to either MEAT or MEAT2.0")
+  if (!version %in% c("MEAT", "MEAT2.0")) {
+    stop(
+      "Please provide a valid version for the muscle clock. Set version to either MEAT or MEAT2.0"
+    )
   }
 
   # Load the elastic net model
   elasticnet_model_MEAT <- NULL
   elasticnet_model_MEAT2.0 <- NULL
-  if (version=="MEAT")
-  {
-    data("elasticnet_model_MEAT",envir = environment())
+  if (version == "MEAT") {
+    data("elasticnet_model_MEAT", envir = environment())
     elasticnet_model <- elasticnet_model_MEAT
     lambda.glmnet.Training <- 0.025
-  }
-
-  else
-  {
-    data("elasticnet_model_MEAT2.0",envir = environment())
+  } else {
+    data("elasticnet_model_MEAT2.0", envir = environment())
     elasticnet_model <- elasticnet_model_MEAT2.0
     lambda.glmnet.Training <- 0.033
   }
 
-
   # Predict age based on calibrated DNA methylation profile
   DNAmage <- NULL
   print(dim)
-  DNAmage <- anti.trafo(predict(elasticnet_model,
-                                t(assays(SE)$beta),
-                                type = "response",
-                                s = lambda.glmnet.Training))[,1]
+  DNAmage <- anti.trafo(predict(
+    elasticnet_model,
+    t(assays(SE)$beta),
+    type = "response",
+    s = lambda.glmnet.Training
+  ))[, 1]
 
-  if (ncol(colData(SE))==0) {
+  if (ncol(colData(SE)) == 0) {
     AAdiff <- NULL
     AAresid <- NULL
-    SE2 <- SummarizedExperiment(assays = assays(SE),
-                               rowData = rowData(SE),
-                               colData = as.data.frame(DNAmage))
-    message("There are no phenotypes provided in colData, so only DNAmage will
-            be returned.")
+    SE2 <- SummarizedExperiment(
+      assays = assays(SE),
+      rowData = rowData(SE),
+      colData = as.data.frame(DNAmage)
+    )
+    message(
+      "There are no phenotypes provided in colData, so only DNAmage will
+            be returned."
+    )
   } else {
     pheno <- colData(SE)
 
     # Check that the column name for age does exist in colData
-    if (!age_col_name %in% colnames(pheno))
-      stop(paste0("colData does not contain a column called ",age_col_name,
-                     ". Please check the column names of colData."))
+    if (!age_col_name %in% colnames(pheno)) {
+      stop(paste0(
+        "colData does not contain a column called ",
+        age_col_name,
+        ". Please check the column names of colData."
+      ))
+    }
 
     pheno <- as_tibble(pheno)
     Age <- pull(pheno[, age_col_name])
     AAdiff <- DNAmage - Age
-    pheno <- data.frame(as.data.frame(pheno),
-                        DNAmage,
-                        AAdiff)
-    if (nrow(pheno)>2)
-    {
+    pheno <- data.frame(as.data.frame(pheno), DNAmage, AAdiff)
+    if (nrow(pheno) > 2) {
       AAresid <- AAdiff
       AAresid_noNA <- resid(lm(DNAmage ~ Age))
       AAresid[!is.na(AAresid)] <- AAresid_noNA
-      pheno <- data.frame(pheno,
-                          AAresid)
+      pheno <- data.frame(pheno, AAresid)
+    } else {
+      message(
+        "You only have two samples in SE, so only DNAmage and AAdiff
+              will be returned."
+      )
     }
-    else
-    {
-      message("You only have two samples in SE, so only DNAmage and AAdiff
-              will be returned.")
-    }
-    SE2 <- SummarizedExperiment(assays = assays(SE),
-                                  rowData = rowData(SE),
-                                  colData = pheno)
+    SE2 <- SummarizedExperiment(
+      assays = assays(SE),
+      rowData = rowData(SE),
+      colData = pheno
+    )
   }
   return(SE2)
 }

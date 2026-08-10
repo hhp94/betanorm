@@ -30,10 +30,22 @@ target <- sort(rnorm(n_vars))
 X_feat <- t(obj)
 
 cat(
-  "dim obj (samples x vars): ", n_samples, " x ", n_vars, "\n",
-  "dim X_feat (feat x samp): ", n_vars, " x ", n_samples, "\n",
-  "length(target): ", length(target), "\n",
-  "iterations: ", iters, "\n",
+  "dim obj (samples x vars): ",
+  n_samples,
+  " x ",
+  n_vars,
+  "\n",
+  "dim X_feat (feat x samp): ",
+  n_vars,
+  " x ",
+  n_samples,
+  "\n",
+  "length(target): ",
+  length(target),
+  "\n",
+  "iterations: ",
+  iters,
+  "\n",
   sep = ""
 )
 
@@ -48,7 +60,9 @@ bm <- bench::mark(
     t(normalize.quantiles.use.target(X_feat, target, copy = TRUE))
   },
   preprocessCore_no_t = normalize.quantiles.use.target(
-    X_feat, target, copy = TRUE
+    X_feat,
+    target,
+    copy = TRUE
   ),
   iterations = iters,
   check = FALSE,

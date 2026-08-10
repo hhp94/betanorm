@@ -70,8 +70,10 @@ validateThresholds <- function(
   if (length(thresholds) != nL - 1L) {
     stop(name, " must have length nL - 1 (", nL - 1L, ").", call. = FALSE)
   }
-  if (require.unit.interval &&
-        any(!is.finite(thresholds) | thresholds <= 0 | thresholds >= 1)) {
+  if (
+    require.unit.interval &&
+      any(!is.finite(thresholds) | thresholds <= 0 | thresholds >= 1)
+  ) {
     stop(name, " must lie strictly inside (0, 1).", call. = FALSE)
   }
   if (is.unsorted(thresholds, strictly = TRUE)) {
@@ -217,7 +219,9 @@ thresholdsFromDensityCrossings <- function(
       call. = FALSE
     )
   }
-  if (any(!is.finite(a) | !is.finite(b) | !is.finite(eta) | !is.finite(means))) {
+  if (
+    any(!is.finite(a) | !is.finite(b) | !is.finite(eta) | !is.finite(means))
+  ) {
     stop(context, " mixture parameters must be finite.", call. = FALSE)
   }
   if (any(a <= 0) || any(b <= 0) || any(eta <= 0)) {
@@ -411,13 +415,22 @@ normalizeNL2Truncated <- function(
   sample.threshold <- as.numeric(sample.threshold)[1L]
   gold.threshold <- as.numeric(gold.threshold)[1L]
 
-  if (length(sample.a) != 2L || length(sample.b) != 2L ||
-        length(gold.a) != 2L || length(gold.b) != 2L) {
+  if (
+    length(sample.a) != 2L ||
+      length(sample.b) != 2L ||
+      length(gold.a) != 2L ||
+      length(gold.b) != 2L
+  ) {
     stop(context, " expects length-2 component shapes.", call. = FALSE)
   }
-  if (!is.finite(sample.threshold) || !is.finite(gold.threshold) ||
-        sample.threshold <= 0 || sample.threshold >= 1 ||
-        gold.threshold <= 0 || gold.threshold >= 1) {
+  if (
+    !is.finite(sample.threshold) ||
+      !is.finite(gold.threshold) ||
+      sample.threshold <= 0 ||
+      sample.threshold >= 1 ||
+      gold.threshold <= 0 ||
+      gold.threshold >= 1
+  ) {
     stop(
       context,
       " thresholds must lie strictly in (0, 1); got sample = ",
@@ -503,7 +516,8 @@ normalizeNL2Truncated <- function(
       sample.a[1L],
       sample.b[1L],
       lower.tail = TRUE
-    ) / FsU_ts
+    ) /
+      FsU_ts
     u <- pmin(1, pmax(0, u))
     out[u_idx] <- stats::qbeta(
       u * FgU_tg,
@@ -520,7 +534,8 @@ normalizeNL2Truncated <- function(
       sample.a[2L],
       sample.b[2L],
       lower.tail = FALSE
-    ) / FsM_ts_upper
+    ) /
+      FsM_ts_upper
     r <- pmin(1, pmax(0, r))
     out[m_idx] <- stats::qbeta(
       r * FgM_tg_upper,
@@ -1535,8 +1550,10 @@ bmiq_calibration <- function(
         stage <- "sample output validation"
 
         # Material out-of-range is an error; tiny roundoff is projected to [0, 1].
-        if (any(!is.finite(nbeta2.v)) ||
-          any(nbeta2.v < -1e-12 | nbeta2.v > 1 + 1e-12)) {
+        if (
+          any(!is.finite(nbeta2.v)) ||
+            any(nbeta2.v < -1e-12 | nbeta2.v > 1 + 1e-12)
+        ) {
           stop(
             "Normalization produced invalid beta values; range: [",
             paste(signif(range(nbeta2.v, finite = TRUE), 8), collapse = ", "),

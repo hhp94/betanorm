@@ -29,68 +29,84 @@ library(MEAT)
 data("GSE121961", envir = environment())
 
 ## ----Methylation matrix presentation table, echo = FALSE----------------------
-kable(head(GSE121961),
-             caption = "Top rows of the GSE121961 matrix before cleaning and calibration.")
+kable(
+  head(GSE121961),
+  caption = "Top rows of the GSE121961 matrix before cleaning and calibration."
+)
 
 ## ----Phenotype table presentation---------------------------------------------
 data("GSE121961_pheno", envir = environment())
 
 ## ----Phenotype table presentation table, echo = FALSE-------------------------
-kable(GSE121961_pheno,
-             caption = "Phenotypes corresponding to GSE121961.")
+kable(GSE121961_pheno, caption = "Phenotypes corresponding to GSE121961.")
 
 ## ----Data formatting, message=FALSE, warning=FALSE----------------------------
 library(SummarizedExperiment)
-GSE121961_SE <- SummarizedExperiment(assays=list(beta=GSE121961),
-colData=GSE121961_pheno)
+GSE121961_SE <- SummarizedExperiment(
+  assays = list(beta = GSE121961),
+  colData = GSE121961_pheno
+)
 GSE121961_SE
 
 ## ----Data cleaning, message=FALSE, warning=FALSE------------------------------
-GSE121961_SE_clean <- clean_beta(SE = GSE121961_SE,
-                                 version = "MEAT2.0")
+GSE121961_SE_clean <- clean_beta(SE = GSE121961_SE, version = "MEAT2.0")
 
 ## ----Data cleaning table, echo = FALSE----------------------------------------
-kable(head(assays(GSE121961_SE_clean)$beta),
-             caption = "Top rows of the GSE121961 beta matrix after cleaning.")
+kable(
+  head(assays(GSE121961_SE_clean)$beta),
+  caption = "Top rows of the GSE121961 beta matrix after cleaning."
+)
 
 ## ----Data calibration, message=FALSE, warning=FALSE---------------------------
-GSE121961_SE_calibrated <- BMIQcalibration(SE = GSE121961_SE_clean,
-                                           version = "MEAT2.0")
+GSE121961_SE_calibrated <- BMIQcalibration(
+  SE = GSE121961_SE_clean,
+  version = "MEAT2.0"
+)
 
 ## ----Data calibration table, echo=FALSE---------------------------------------
-kable(head(assays(GSE121961_SE_calibrated)$beta),
-             caption = "Top rows of the GSE121961 beta matrix after cleaning and calibration.")
+kable(
+  head(assays(GSE121961_SE_calibrated)$beta),
+  caption = "Top rows of the GSE121961 beta matrix after cleaning and calibration."
+)
 
 ## ----DNA methylation profile distribution before and after calibration, message=FALSE, warning=FALSE----
 data("gold.mean.MEAT2.0", envir = environment())
-GSE121961_SE_clean_with_gold_mean <- cbind(assays(GSE121961_SE_clean)$beta,
-                                           gold.mean.MEAT2.0$gold.mean) # add the gold mean
-GSE121961_SE_calibrated_with_gold_mean <- cbind(assays(GSE121961_SE_calibrated)$beta,
-                                                gold.mean.MEAT2.0$gold.mean) # add the gold mean
-groups <- c(rep("GSE121961",
-                ncol(GSE121961_SE_clean)), "Gold mean")
+GSE121961_SE_clean_with_gold_mean <- cbind(
+  assays(GSE121961_SE_clean)$beta,
+  gold.mean.MEAT2.0$gold.mean
+) # add the gold mean
+GSE121961_SE_calibrated_with_gold_mean <- cbind(
+  assays(GSE121961_SE_calibrated)$beta,
+  gold.mean.MEAT2.0$gold.mean
+) # add the gold mean
+groups <- c(rep("GSE121961", ncol(GSE121961_SE_clean)), "Gold mean")
 
 library(minfi)
 par(mfrow = c(2, 1))
-densityPlot(GSE121961_SE_clean_with_gold_mean,
+densityPlot(
+  GSE121961_SE_clean_with_gold_mean,
   sampGroups = groups,
   main = "Before calibration",
   legend = FALSE
 )
-densityPlot(GSE121961_SE_calibrated_with_gold_mean,
+densityPlot(
+  GSE121961_SE_calibrated_with_gold_mean,
   sampGroups = groups,
   main = "After calibration"
 )
 
 ## ----Epigenetic age estimation with phenotypes, message=FALSE, warning=FALSE----
-GSE121961_SE_epiage <- epiage_estimation(SE = GSE121961_SE_calibrated,
-                                         age_col_name = "Age",
-                                         version = "MEAT2.0")
+GSE121961_SE_epiage <- epiage_estimation(
+  SE = GSE121961_SE_calibrated,
+  age_col_name = "Age",
+  version = "MEAT2.0"
+)
 
 ## ----Epigenetic age estimation with phenotypes table, echo=FALSE--------------
-kable(colData(GSE121961_SE_epiage),
-             caption = "Phenotypes corresponding to GSE121961 with AAdiff for each sample.")
+kable(
+  colData(GSE121961_SE_epiage),
+  caption = "Phenotypes corresponding to GSE121961 with AAdiff for each sample."
+)
 
 ## ----session info-------------------------------------------------------------
 sessionInfo()
-

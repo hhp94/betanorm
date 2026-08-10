@@ -28,25 +28,24 @@
 ##
 ##################################################################
 
-normalize.quantiles <- function(x,copy=TRUE,keep.names=FALSE){
-
+normalize.quantiles <- function(x, copy = TRUE, keep.names = FALSE) {
   rows <- dim(x)[1]
   cols <- dim(x)[2]
 
-  if (!is.matrix(x)){
+  if (!is.matrix(x)) {
     stop("Matrix expected in normalize.quantiles")
   }
 
-  if (is.integer(x)){
-    x <- matrix(as.double(x),rows,cols)
+  if (is.integer(x)) {
+    x <- matrix(as.double(x), rows, cols)
     copy <- FALSE
   }
 
   #matrix(.C("qnorm_c", as.double(as.vector(x)), as.integer(rows), as.integer(cols))[[1]], rows, cols)
 
-##  .Call("R_qnorm_c",x,copy, PACKAGE="preprocessCore");
-  mat <- .Call("R_qnorm_c_handleNA",x,copy, PACKAGE="preprocessCore");
-  if(keep.names){
+  ##  .Call("R_qnorm_c",x,copy, PACKAGE="preprocessCore");
+  mat <- .Call("R_qnorm_c_handleNA", x, copy, PACKAGE = "preprocessCore")
+  if (keep.names) {
     rownames(mat) <- rownames(x)
     colnames(mat) <- colnames(x)
   }
@@ -54,29 +53,39 @@ normalize.quantiles <- function(x,copy=TRUE,keep.names=FALSE){
 }
 
 
-normalize.quantiles.robust <- function(x,copy=TRUE,weights=NULL,remove.extreme=c("variance","mean","both","none"),n.remove=1,use.median=FALSE,use.log2=FALSE,keep.names=FALSE){
-
-  calc.var.ratios <- function(x){
+normalize.quantiles.robust <- function(
+  x,
+  copy = TRUE,
+  weights = NULL,
+  remove.extreme = c("variance", "mean", "both", "none"),
+  n.remove = 1,
+  use.median = FALSE,
+  use.log2 = FALSE,
+  keep.names = FALSE
+) {
+  calc.var.ratios <- function(x) {
     cols <- dim(x)[2]
-    vars <- apply(x,2,var)
-    results <- matrix(0,cols,cols)
-    for (i in 1:cols-1)
-      for (j in (i+1):cols){
-        results[i,j] <- vars[i]/vars[j]
-        results[j,i] <- vars[j]/vars[i]
+    vars <- apply(x, 2, var)
+    results <- matrix(0, cols, cols)
+    for (i in 1:cols - 1) {
+      for (j in (i + 1):cols) {
+        results[i, j] <- vars[i] / vars[j]
+        results[j, i] <- vars[j] / vars[i]
       }
+    }
     results
   }
 
-  calc.mean.dists <- function(x){
+  calc.mean.dists <- function(x) {
     cols <- dim(x)[2]
     means <- colMeans(x)
-    results <- matrix(0,cols,cols)
-    for (i in 1:cols-1)
-      for (j in (i+1):cols){
-        results[i,j] <- means[i] - means[j]
-        results[j,i] <- means[j] - means[i]
+    results <- matrix(0, cols, cols)
+    for (i in 1:cols - 1) {
+      for (j in (i + 1):cols) {
+        results[i, j] <- means[i] - means[j]
+        results[j, i] <- means[j] - means[i]
       }
+    }
     results
   }
 
@@ -86,31 +95,46 @@ normalize.quantiles.robust <- function(x,copy=TRUE,weights=NULL,remove.extreme=c
   rows <- dim(x)[1]
   cols <- dim(x)[2]
 
-  if (is.null(weights)){
-    weights <- .Call("R_qnorm_robust_weights",x,remove.extreme,as.integer(n.remove),PACKAGE="preprocessCore")
+  if (is.null(weights)) {
+    weights <- .Call(
+      "R_qnorm_robust_weights",
+      x,
+      remove.extreme,
+      as.integer(n.remove),
+      PACKAGE = "preprocessCore"
+    )
   } else {
-    if (is.numeric(weights)){
-      if (length(weights) != cols){
+    if (is.numeric(weights)) {
+      if (length(weights) != cols) {
         stop("Weights vector incorrect length\n")
       }
-      if (sum(weights > 0) < 1){
+      if (sum(weights > 0) < 1) {
         stop("Need at least one non negative weights\n")
       }
-      if (any(weights < 0)){
+      if (any(weights < 0)) {
         stop("Can't have negative weights")
       }
     } else {
-      if (weights =="huber"){
+      if (weights == "huber") {
         use.huber <- TRUE
-        weights <- rep(1,cols)
+        weights <- rep(1, cols)
       } else {
         stop("Don't recognise weights argument as valid.")
       }
     }
   }
-  
-  mat <- .Call("R_qnorm_robust_c",x,copy,weights,as.integer(use.median),as.integer(use.log2),as.integer(use.huber),PACKAGE="preprocessCore")
-  if(keep.names){
+
+  mat <- .Call(
+    "R_qnorm_robust_c",
+    x,
+    copy,
+    weights,
+    as.integer(use.median),
+    as.integer(use.log2),
+    as.integer(use.huber),
+    PACKAGE = "preprocessCore"
+  )
+  if (keep.names) {
     rownames(mat) <- rownames(x)
     colnames(mat) <- colnames(x)
   }

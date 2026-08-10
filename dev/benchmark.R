@@ -232,7 +232,13 @@ p_map <- ggplot(map_df, aes(x = beta, y = calibrated, colour = method)) +
   coord_equal(xlim = c(0, 1), ylim = c(0, 1)) +
   scale_colour_manual(values = map_cols) +
   labs(
-    title = paste0("Calibrated map g(beta) (", sample_id, ", i=", sample_i, ")"),
+    title = paste0(
+      "Calibrated map g(beta) (",
+      sample_id,
+      ", i=",
+      sample_i,
+      ")"
+    ),
     subtitle = "Grey dashed: production nL = 3 density cuts",
     x = "raw beta",
     y = "calibrated beta",
@@ -279,14 +285,21 @@ for (nm in names(dens_series)) {
       width = if (nm == "gold (raw)") 2.5 else 1.8,
       dash = unname(dens_linetypes[[nm]])
     ),
-    hovertemplate = paste0(nm, "<br>beta: %{x:.3f}<br>density: %{y:.3f}<extra></extra>")
+    hovertemplate = paste0(
+      nm,
+      "<br>beta: %{x:.3f}<br>density: %{y:.3f}<extra></extra>"
+    )
   )
 }
 p_density_plotly <- layout(
   p_density_plotly,
   title = list(
     text = paste0(
-      "Beta density (", sample_id, ", i=", sample_i, ")<br>",
+      "Beta density (",
+      sample_id,
+      ", i=",
+      sample_i,
+      ")<br>",
       "<sup>raw gold (empirical) vs sample before / calibrated — ",
       "click legend to toggle</sup>"
     )
@@ -320,7 +333,8 @@ for (nm in levels(map_df$method)) {
     name = nm,
     line = list(color = unname(map_cols[[nm]]), width = 1.8),
     hovertemplate = paste0(
-      nm, "<br>raw: %{x:.3f}<br>calibrated: %{y:.3f}<extra></extra>"
+      nm,
+      "<br>raw: %{x:.3f}<br>calibrated: %{y:.3f}<extra></extra>"
     )
   )
 }
@@ -345,7 +359,11 @@ p_map_plotly <- layout(
   p_map_plotly,
   title = list(
     text = paste0(
-      "Calibrated map g(beta) (", sample_id, ", i=", sample_i, ")<br>",
+      "Calibrated map g(beta) (",
+      sample_id,
+      ", i=",
+      sample_i,
+      ")<br>",
       "<sup>click legend to toggle</sup>"
     )
   ),
@@ -393,8 +411,10 @@ strip_random_indices <- function(diagnostics) {
   if (!is.null(diagnostics$gold)) {
     diagnostics$gold$random_indices <- NULL
   }
-  if (length(diagnostics$samples) >= 1L &&
-    !is.null(diagnostics$samples[[1L]])) {
+  if (
+    length(diagnostics$samples) >= 1L &&
+      !is.null(diagnostics$samples[[1L]])
+  ) {
     diagnostics$samples[[1L]]$random_indices <- NULL
   }
   diagnostics
@@ -453,5 +473,3 @@ message("Saved: ", file.path(out_dir, "benchmark-map.png"))
 message("Saved: ", file.path(out_dir, "benchmark-density.html"))
 message("Saved: ", file.path(out_dir, "benchmark-map.html"))
 message("Done.")
-
-

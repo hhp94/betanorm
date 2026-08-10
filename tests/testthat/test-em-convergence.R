@@ -13,10 +13,14 @@ test_that("EM always returns dual criteria and never converges after one iterati
 
   expect_false(isTRUE(fit1$converged))
   expect_equal(fit1$iterations, 1L)
-  expect_true(is.finite(fit1$parameter_criterion) ||
-    is.infinite(fit1$parameter_criterion))
-  expect_true(is.finite(fit1$loglik_criterion) ||
-    is.infinite(fit1$loglik_criterion))
+  expect_true(
+    is.finite(fit1$parameter_criterion) ||
+      is.infinite(fit1$parameter_criterion)
+  )
+  expect_true(
+    is.finite(fit1$loglik_criterion) ||
+      is.infinite(fit1$loglik_criterion)
+  )
   expect_null(fit1$parameter_criterion_trace)
   expect_null(fit1$loglik_criterion_trace)
 })

@@ -66,18 +66,20 @@ mock_h_failure <- function(real) {
   # Force `real` now: if it stayed a lazy promise it would resolve to the
   # mocked binding (itself) once installed, causing infinite recursion.
   force(real)
-  function(beta,
-           thresholds,
-           nL,
-           nfit,
-           niter,
-           tol,
-           beta.maxit,
-           beta.score.tol,
-           context,
-           debug = FALSE,
-           seed = 1L,
-           fit.idx = NULL) {
+  function(
+    beta,
+    thresholds,
+    nL,
+    nfit,
+    niter,
+    tol,
+    beta.maxit,
+    beta.score.tol,
+    context,
+    debug = FALSE,
+    seed = 1L,
+    fit.idx = NULL
+  ) {
     fit <- real(
       beta = beta,
       thresholds = thresholds,

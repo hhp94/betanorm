@@ -20,8 +20,10 @@ strip_random_indices <- function(diagnostics) {
   if (!is.null(diagnostics$gold)) {
     diagnostics$gold$random_indices <- NULL
   }
-  if (length(diagnostics$samples) >= 1L &&
-    !is.null(diagnostics$samples[[1L]])) {
+  if (
+    length(diagnostics$samples) >= 1L &&
+      !is.null(diagnostics$samples[[1L]])
+  ) {
     diagnostics$samples[[1L]]$random_indices <- NULL
   }
   diagnostics

@@ -26,8 +26,10 @@ check_thresholds <- function(
   if (any(!is.finite(thresholds))) {
     stop(name, " must contain only finite values.", call. = FALSE)
   }
-  if (require.unit.interval &&
-    any(thresholds <= 0 | thresholds >= 1)) {
+  if (
+    require.unit.interval &&
+      any(thresholds <= 0 | thresholds >= 1)
+  ) {
     stop(name, " must lie strictly inside (0, 1).", call. = FALSE)
   }
   if (any(diff(thresholds) <= 0)) {
@@ -73,10 +75,12 @@ density_thresholds <- function(
   means <- as.numeric(component.means)
   nL <- length(means)
 
-  if (nL < 2L ||
-    length(a) != nL ||
-    length(b) != nL ||
-    length(eta) != nL) {
+  if (
+    nL < 2L ||
+      length(a) != nL ||
+      length(b) != nL ||
+      length(eta) != nL
+  ) {
     stop(context, " has inconsistent mixture dimensions.", call. = FALSE)
   }
 
@@ -104,8 +108,10 @@ density_thresholds <- function(
     db <- b[k] - b[k + 1L]
 
     constant <-
-      log(eta[k]) - lbeta(a[k], b[k]) -
-      log(eta[k + 1L]) + lbeta(a[k + 1L], b[k + 1L])
+      log(eta[k]) -
+      lbeta(a[k], b[k]) -
+      log(eta[k + 1L]) +
+      lbeta(a[k + 1L], b[k + 1L])
 
     log_score_diff <- function(x) {
       constant + da * log(x) + db * log1p(-x)
@@ -121,9 +127,11 @@ density_thresholds <- function(
 
     if (denominator != 0) {
       turning.point <- da / denominator
-      if (is.finite(turning.point) &&
-        turning.point > lo &&
-        turning.point < hi) {
+      if (
+        is.finite(turning.point) &&
+          turning.point > lo &&
+          turning.point < hi
+      ) {
         cuts <- sort(c(lo, turning.point, hi))
       }
     }
@@ -239,29 +247,45 @@ normalize_nl2 <- function(
   }
 
   log.FsU.ts <- threshold_log_mass(
-    sample.threshold, sample.a[1L], sample.b[1L],
-    lower.tail = TRUE, "sample U CDF"
+    sample.threshold,
+    sample.a[1L],
+    sample.b[1L],
+    lower.tail = TRUE,
+    "sample U CDF"
   )
   log.FsM.ts <- threshold_log_mass(
-    sample.threshold, sample.a[2L], sample.b[2L],
-    lower.tail = FALSE, "sample M upper-tail CDF"
+    sample.threshold,
+    sample.a[2L],
+    sample.b[2L],
+    lower.tail = FALSE,
+    "sample M upper-tail CDF"
   )
   log.FgU.tg <- threshold_log_mass(
-    gold.threshold, gold.a[1L], gold.b[1L],
-    lower.tail = TRUE, "gold U CDF"
+    gold.threshold,
+    gold.a[1L],
+    gold.b[1L],
+    lower.tail = TRUE,
+    "gold U CDF"
   )
   log.FgM.tg <- threshold_log_mass(
-    gold.threshold, gold.a[2L], gold.b[2L],
-    lower.tail = FALSE, "gold M upper-tail CDF"
+    gold.threshold,
+    gold.a[2L],
+    gold.b[2L],
+    lower.tail = FALSE,
+    "gold M upper-tail CDF"
   )
 
   map_tail <- function(x, k, lower.tail, log.sample.cut, log.gold.cut) {
     log.conditional <- pmin(
       0,
       stats::pbeta(
-        x, sample.a[k], sample.b[k],
-        lower.tail = lower.tail, log.p = TRUE
-      ) - log.sample.cut
+        x,
+        sample.a[k],
+        sample.b[k],
+        lower.tail = lower.tail,
+        log.p = TRUE
+      ) -
+        log.sample.cut
     )
     stats::qbeta(
       log.conditional + log.gold.cut,
@@ -278,15 +302,21 @@ normalize_nl2 <- function(
 
   if (length(u_idx)) {
     out[u_idx] <- map_tail(
-      out[u_idx], 1L,
-      lower.tail = TRUE, log.FsU.ts, log.FgU.tg
+      out[u_idx],
+      1L,
+      lower.tail = TRUE,
+      log.FsU.ts,
+      log.FgU.tg
     )
   }
 
   if (length(m_idx)) {
     out[m_idx] <- map_tail(
-      out[m_idx], 2L,
-      lower.tail = FALSE, log.FsM.ts, log.FgM.tg
+      out[m_idx],
+      2L,
+      lower.tail = FALSE,
+      log.FsM.ts,
+      log.FgM.tg
     )
   }
 
@@ -322,9 +352,13 @@ canonicalize_em_components <- function(em, context) {
   eta <- as.numeric(em$eta)
   mu <- as.numeric(em$mu[, 1L])
 
-  if (any(!is.finite(c(a, b, eta, mu))) ||
-    any(a <= 0) || any(b <= 0) || any(eta <= 0) ||
-    any(mu <= 0 | mu >= 1)) {
+  if (
+    any(!is.finite(c(a, b, eta, mu))) ||
+      any(a <= 0) ||
+      any(b <= 0) ||
+      any(eta <= 0) ||
+      any(mu <= 0 | mu >= 1)
+  ) {
     stop(context, " returned invalid mixture parameters.", call. = FALSE)
   }
 
@@ -555,8 +589,14 @@ map_beta_q <- function(x, a.sample, b.sample, a.gold, b.gold, lower.tail) {
 # Shared validation of the EM settings used by both bmiq_gold_fit() and
 # bmiq_calibration(). Owns the legacy-drift warning so it fires exactly once
 # per user-facing call. Returns the coerced integer settings.
-validate_em_settings <- function(nL, nfit, niter, tol, beta.maxit,
-                                 beta.score.tol) {
+validate_em_settings <- function(
+  nL,
+  nfit,
+  niter,
+  tol,
+  beta.maxit,
+  beta.score.tol
+) {
   nL <- as.integer(checkmate::assert_int(nL, lower = 2L, upper = 3L))
   nfit <- as.integer(checkmate::assert_int(nfit, lower = 2L * nL))
   niter <- as.integer(checkmate::assert_int(niter, lower = 1L))
@@ -568,7 +608,8 @@ validate_em_settings <- function(nL, nfit, niter, tol, beta.maxit,
 
   if (nL == 3L && niter > LEGACY_BMIQ_NITER) {
     warning(
-      "nL = 3 with niter > ", LEGACY_BMIQ_NITER,
+      "nL = 3 with niter > ",
+      LEGACY_BMIQ_NITER,
       " is not exactly compatible with legacy ",
       "five-iteration BMIQ results. This is expected if you intentionally ",
       "want the three-component fit to run further toward convergence.",
@@ -714,7 +755,12 @@ bmiq_gold_fit <- function(
   checkmate::assert_flag(debug)
   checkmate::assert_flag(verbose)
   settings <- validate_em_settings(
-    nL, nfit, niter, tol, beta.maxit, beta.score.tol
+    nL,
+    nfit,
+    niter,
+    tol,
+    beta.maxit,
+    beta.score.tol
   )
 
   fit_gold_standard(
@@ -876,7 +922,12 @@ bmiq_calibration <- function(
   )
 
   settings <- validate_em_settings(
-    nL, nfit, niter, tol, beta.maxit, beta.score.tol
+    nL,
+    nfit,
+    niter,
+    tol,
+    beta.maxit,
+    beta.score.tol
   )
   nL <- settings$nL
   nfit <- settings$nfit
@@ -1127,8 +1178,10 @@ bmiq_calibration <- function(
           if (length(selUL.idx)) {
             nbeta2.v[selUL.idx] <- map_beta_q(
               beta2.v[selUL.idx],
-              em2.o$a[U], em2.o$b[U],
-              gold.a[U], gold.b[U],
+              em2.o$a[U],
+              em2.o$b[U],
+              gold.a[U],
+              gold.b[U],
               lower.tail = TRUE
             )
           }
@@ -1136,8 +1189,10 @@ bmiq_calibration <- function(
           if (length(selUR.idx)) {
             nbeta2.v[selUR.idx] <- map_beta_q(
               beta2.v[selUR.idx],
-              em2.o$a[U], em2.o$b[U],
-              gold.a[U], gold.b[U],
+              em2.o$a[U],
+              em2.o$b[U],
+              gold.a[U],
+              gold.b[U],
               lower.tail = FALSE
             )
           }
@@ -1147,8 +1202,10 @@ bmiq_calibration <- function(
           if (length(selMR.idx)) {
             nbeta2.v[selMR.idx] <- map_beta_q(
               beta2.v[selMR.idx],
-              em2.o$a[M], em2.o$b[M],
-              gold.a[M], gold.b[M],
+              em2.o$a[M],
+              em2.o$b[M],
+              gold.a[M],
+              gold.b[M],
               lower.tail = FALSE
             )
           }
@@ -1244,8 +1301,10 @@ bmiq_calibration <- function(
 
         stage <- "sample output validation"
 
-        if (any(!is.finite(nbeta2.v)) ||
-          any(nbeta2.v < -1e-12 | nbeta2.v > 1 + 1e-12)) {
+        if (
+          any(!is.finite(nbeta2.v)) ||
+            any(nbeta2.v < -1e-12 | nbeta2.v > 1 + 1e-12)
+        ) {
           stop(
             "Normalization produced invalid beta values; range: [",
             paste(signif(range(nbeta2.v, finite = TRUE), 8), collapse = ", "),

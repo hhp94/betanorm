@@ -343,7 +343,14 @@ betaEst.old <- function(y, w, weights) {
     return(exp(logab))
   }
   opt <- try(
-    optim(logab, betaObjf.old, ydata = y, wdata = w, weights = weights, method = "BFGS"),
+    optim(
+      logab,
+      betaObjf.old,
+      ydata = y,
+      wdata = w,
+      weights = weights,
+      method = "BFGS"
+    ),
     silent = TRUE
   )
   if (inherits(opt, "try-error")) {
