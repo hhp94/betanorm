@@ -80,10 +80,11 @@ density_thresholds <- function(
     stop(context, " has inconsistent mixture dimensions.", call. = FALSE)
   }
 
-  if (any(!is.finite(c(a, b, eta, means))) ||
-    any(a <= 0) || any(b <= 0) || any(eta <= 0) ||
-    any(means <= 0 | means >= 1) ||
-    any(diff(means) <= 0)) {
+  # Shape positivity and finiteness are owned by canonicalize_em_components()
+  # at the C++ boundary; the crossing search below only additionally requires
+  # strictly increasing component means (non-finite parameters would still be
+  # caught by find_crossing's finite-ratio check).
+  if (any(diff(means) <= 0)) {
     stop(
       context,
       " has invalid or unordered mixture parameters.",
@@ -595,7 +596,6 @@ fit_gold_standard <- function(
   goldstandard.beta <- as.numeric(goldstandard.beta)
   checkmate::assert_numeric(
     goldstandard.beta,
-    any.missing = FALSE,
     min.len = 2L * nL,
     .var.name = "goldstandard.beta"
   )
@@ -737,8 +737,9 @@ bmiq_gold_fit <- function(
 #' beta profile (beta-mixture quantile mapping). Provided for pipelines that
 #' require this procedure; defaults target legacy BMIQ compatibility.
 #'
-#' @param datM Numeric matrix of beta values: samples in rows, CpGs in
-#'   columns. Values must be finite, non-missing, and in \eqn{[0, 1]}.
+#' @param datM Double-precision numeric matrix of beta values: samples in
+#'   rows, CpGs in columns. Values must be finite, non-missing, and in
+#'   \eqn{[0, 1]}; integer matrices are rejected rather than coerced.
 #' @param goldstandard.beta Numeric vector of gold-standard betas, or a
 #'   prefitted [bmiq_gold_fit()] object. The gold standard is consumed purely
 #'   distributionally, so the vector does not need to align with (or match
@@ -864,14 +865,15 @@ bmiq_calibration <- function(
 
   checkmate::assert_flag(debug)
   checkmate::assert_flag(verbose)
+  # Storage mode double is asserted (not coerced) so the C++ layer never
+  # pays a per-call coercion copy; missing values are caught by the single
+  # finite/range scan below, which owns that invariant.
   checkmate::assert_matrix(
     datM,
-    mode = "numeric",
-    any.missing = FALSE,
+    mode = "double",
     min.rows = 1L,
     min.cols = 1L
   )
-  storage.mode(datM) <- "double"
 
   settings <- validate_em_settings(
     nL, nfit, niter, tol, beta.maxit, beta.score.tol
@@ -979,8 +981,8 @@ bmiq_calibration <- function(
     seed = 1L
   )
 
+  # beta2.v arrives as a bare double vector (a gathered block column).
   process_sample <- function(ii, beta2.v) {
-    beta2.v <- as.numeric(beta2.v)
     sample.name <- sample.names[ii]
     stage <- "initialization"
 

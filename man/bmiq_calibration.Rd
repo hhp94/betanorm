@@ -29,8 +29,9 @@ bmiq_calibration(
 \method{as.matrix}{bmiq_calibration_result}(x, ...)
 }
 \arguments{
-\item{datM}{Numeric matrix of beta values: samples in rows, CpGs in
-columns. Values must be finite, non-missing, and in \eqn{[0, 1]}.}
+\item{datM}{Double-precision numeric matrix of beta values: samples in
+rows, CpGs in columns. Values must be finite, non-missing, and in
+\eqn{[0, 1]}; integer matrices are rejected rather than coerced.}
 
 \item{goldstandard.beta}{Numeric vector of gold-standard betas, or a
 prefitted \code{\link[=bmiq_gold_fit]{bmiq_gold_fit()}} object. The gold standard is consumed purely

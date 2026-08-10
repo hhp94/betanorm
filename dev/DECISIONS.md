@@ -80,6 +80,27 @@ by default) so release builds carry zero overhead.
   math (truncated conditional maps vs plain quantile maps + H stitching);
   merging would change legacy nL = 3 output.
 
+## 2026-08-10 — Validation: one owner per invariant
+
+Defensiveness audit outcome. Each invariant has exactly one owner; a second
+check of the same invariant elsewhere is a bug (drift risk, misleading error
+source), not extra safety:
+
+- **Type/shape of user args** — checkmate at the two exported entry points.
+  `datM` must already be storage-mode double (asserted, not coerced): an
+  integer matrix reaching the C++ layer would silently coerce-copy per block
+  call, so rejection is the honest contract.
+- **Finite + [0, 1] range (incl. NA/NaN)** — `scan_finite_unit_interval_cpp`,
+  single pass. checkmate's `any.missing` was dropped as a duplicate owner.
+- **Sanity of the fitted mixture** — `canonicalize_em_components()` at the
+  C++ boundary. `density_thresholds()` keeps only what the crossing search
+  itself needs (dimensions + strictly increasing means).
+- **EM's strict-interior (0, 1) precondition on y** — the C++ EM itself.
+- Guards that look defensive but are reachable and stay: the clipping-range
+  guard (all-0/1 fit subsets), `th2.initial` collapse on degenerate data,
+  the +/-1e-12 output tolerance + clamp (H map ulp overshoot), and all
+  statistical class-count / crossing checks.
+
 ## Legacy compatibility (predates this log; do not drift)
 
 - `nL = 3`, `niter = 5` is the intentional legacy BMIQ configuration
