@@ -5,3 +5,4 @@
 ^dev$
 ^\.claude$
 ^README\.Rmd$
+^CLAUDE\.md$
