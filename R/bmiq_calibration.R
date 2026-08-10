@@ -1,3 +1,13 @@
+# Legacy BMIQ caps the outer EM at five iterations. The niter default and the
+# legacy-drift warning must stay in sync, so both read this constant.
+LEGACY_BMIQ_NITER <- 5L
+
+# Windows used to locate each sample's unmethylated / methylated density modes
+# when constructing initial EM thresholds: modes are estimated from values
+# below MODE_WINDOW_LOW and above MODE_WINDOW_HIGH respectively.
+MODE_WINDOW_LOW <- 0.4
+MODE_WINDOW_HIGH <- 0.6
+
 check_thresholds <- function(
   thresholds,
   nL,
@@ -190,6 +200,8 @@ density_thresholds <- function(
 # Sample cut t_s and gold cut t_g are the U/M density-crossing thresholds.
 # U side (x <= t_s): conditional quantile of F_sU on (0, t_s] -> (0, t_g].
 # M side (x > t_s): conditional upper-tail map of F_sM on (t_s, 1] -> (t_g, 1].
+# Shapes and thresholds come from fit_mixture()/density_thresholds(), which
+# already guarantee length-2 canonical shapes and cuts strictly inside (0, 1).
 normalize_nl2 <- function(
   beta,
   class,
@@ -201,39 +213,13 @@ normalize_nl2 <- function(
   gold.threshold,
   context = "nL=2 truncated map"
 ) {
-  beta <- as.numeric(beta)
-  class <- as.integer(class)
-  sample.a <- as.numeric(sample.a)
-  sample.b <- as.numeric(sample.b)
-  gold.a <- as.numeric(gold.a)
-  gold.b <- as.numeric(gold.b)
-  sample.threshold <- as.numeric(sample.threshold)[1L]
-  gold.threshold <- as.numeric(gold.threshold)[1L]
-
-  if (length(sample.a) != 2L || length(sample.b) != 2L ||
-    length(gold.a) != 2L || length(gold.b) != 2L) {
-    stop(context, " expects length-2 component shapes.", call. = FALSE)
-  }
-  if (!is.finite(sample.threshold) || !is.finite(gold.threshold) ||
-    sample.threshold <= 0 || sample.threshold >= 1 ||
-    gold.threshold <= 0 || gold.threshold >= 1) {
-    stop(
-      context,
-      " thresholds must lie strictly in (0, 1); got sample = ",
-      signif(sample.threshold, 8),
-      ", gold = ",
-      signif(gold.threshold, 8),
-      ".",
-      call. = FALSE
-    )
-  }
-
   # Work in log-probability throughout: an extreme but nonzero tail mass can
   # underflow pbeta() to exactly 0 on the natural scale and force a spurious
   # rejection, whereas log.p returns a finite log-mass. A conditional CDF
   # (numerator log-mass minus threshold log-mass) is clamped at 0 (probability
   # 1), then re-inflated by the gold threshold log-mass before qbeta().
-  check_log_mass <- function(value, label) {
+  threshold_log_mass <- function(q, a, b, lower.tail, label) {
+    value <- stats::pbeta(q, a, b, lower.tail = lower.tail, log.p = TRUE)
     # A real probability has log-mass <= 0; a tiny positive value is rounding
     # noise at prob = 1 and is harmless, but -Inf means the threshold sits on
     # the boundary with no usable conditioning mass.
@@ -251,70 +237,55 @@ normalize_nl2 <- function(
     min(0, value)
   }
 
-  log.FsU.ts <- check_log_mass(
-    stats::pbeta(
-      sample.threshold, sample.a[1L], sample.b[1L],
-      lower.tail = TRUE, log.p = TRUE
-    ),
-    "sample U CDF"
+  log.FsU.ts <- threshold_log_mass(
+    sample.threshold, sample.a[1L], sample.b[1L],
+    lower.tail = TRUE, "sample U CDF"
   )
-  log.FsM.ts <- check_log_mass(
-    stats::pbeta(
-      sample.threshold, sample.a[2L], sample.b[2L],
-      lower.tail = FALSE, log.p = TRUE
-    ),
-    "sample M upper-tail CDF"
+  log.FsM.ts <- threshold_log_mass(
+    sample.threshold, sample.a[2L], sample.b[2L],
+    lower.tail = FALSE, "sample M upper-tail CDF"
   )
-  log.FgU.tg <- check_log_mass(
-    stats::pbeta(
-      gold.threshold, gold.a[1L], gold.b[1L],
-      lower.tail = TRUE, log.p = TRUE
-    ),
-    "gold U CDF"
+  log.FgU.tg <- threshold_log_mass(
+    gold.threshold, gold.a[1L], gold.b[1L],
+    lower.tail = TRUE, "gold U CDF"
   )
-  log.FgM.tg <- check_log_mass(
-    stats::pbeta(
-      gold.threshold, gold.a[2L], gold.b[2L],
-      lower.tail = FALSE, log.p = TRUE
-    ),
-    "gold M upper-tail CDF"
+  log.FgM.tg <- threshold_log_mass(
+    gold.threshold, gold.a[2L], gold.b[2L],
+    lower.tail = FALSE, "gold M upper-tail CDF"
   )
 
-  out <- beta
-  u_idx <- which(class == 1L)
-  m_idx <- which(class == 2L)
-
-  if (length(u_idx)) {
-    log.u <- pmin(
+  map_tail <- function(x, k, lower.tail, log.sample.cut, log.gold.cut) {
+    log.conditional <- pmin(
       0,
       stats::pbeta(
-        beta[u_idx], sample.a[1L], sample.b[1L],
-        lower.tail = TRUE, log.p = TRUE
-      ) - log.FsU.ts
+        x, sample.a[k], sample.b[k],
+        lower.tail = lower.tail, log.p = TRUE
+      ) - log.sample.cut
     )
-    out[u_idx] <- stats::qbeta(
-      log.u + log.FgU.tg,
-      gold.a[1L],
-      gold.b[1L],
-      lower.tail = TRUE,
+    stats::qbeta(
+      log.conditional + log.gold.cut,
+      gold.a[k],
+      gold.b[k],
+      lower.tail = lower.tail,
       log.p = TRUE
     )
   }
 
-  if (length(m_idx)) {
-    log.r <- pmin(
-      0,
-      stats::pbeta(
-        beta[m_idx], sample.a[2L], sample.b[2L],
-        lower.tail = FALSE, log.p = TRUE
-      ) - log.FsM.ts
+  out <- as.numeric(beta)
+  u_idx <- which(class == 1L)
+  m_idx <- which(class == 2L)
+
+  if (length(u_idx)) {
+    out[u_idx] <- map_tail(
+      out[u_idx], 1L,
+      lower.tail = TRUE, log.FsU.ts, log.FgU.tg
     )
-    out[m_idx] <- stats::qbeta(
-      log.r + log.FgM.tg,
-      gold.a[2L],
-      gold.b[2L],
-      lower.tail = FALSE,
-      log.p = TRUE
+  }
+
+  if (length(m_idx)) {
+    out[m_idx] <- map_tail(
+      out[m_idx], 2L,
+      lower.tail = FALSE, log.FsM.ts, log.FgM.tg
     )
   }
 
@@ -328,7 +299,7 @@ estimate_mode <- function(x, context) {
   if (!length(x)) {
     stop(context, " is empty; cannot estimate mode.", call. = FALSE)
   }
-  if (length(x) == 1L || all(x == x[1L])) {
+  if (all(x == x[1L])) {
     return(x[1L])
   }
   estimate <- density(x)
@@ -414,15 +385,22 @@ fit_mixture <- function(
   beta.score.tol,
   context,
   debug = FALSE,
-  seed = 1L
+  seed = 1L,
+  fit.idx = NULL
 ) {
-  rand.idx <- draw_fit_indices(
-    length(beta),
-    min(nfit, length(beta)),
-    seed
-  )
+  # The fit subset depends only on (length(beta), nfit, seed), so callers
+  # looping over same-length samples pass a precomputed fit.idx instead of
+  # redrawing the identical permutation for every sample.
+  if (is.null(fit.idx)) {
+    fit.idx <- draw_fit_indices(
+      length(beta),
+      min(nfit, length(beta)),
+      seed
+    )
+  }
+  beta.fit <- as.numeric(beta[fit.idx])
 
-  initial.class <- class_by_thresh(beta[rand.idx], thresholds)
+  initial.class <- class_by_thresh(beta.fit, thresholds)
 
   initial.counts <- require_all_classes(
     class = initial.class,
@@ -434,15 +412,15 @@ fit_mixture <- function(
   # One-hot responsibilities for the fit subset only; allocating a full
   # length(beta) x nL matrix and then keeping only sampled rows wastes memory
   # proportional to the whole probe set.
-  w.init <- matrix(0, nrow = length(rand.idx), ncol = nL)
-  w.init[cbind(seq_along(rand.idx), initial.class)] <- 1
+  w.init <- matrix(0, nrow = length(fit.idx), ncol = nL)
+  w.init[cbind(seq_along(fit.idx), initial.class)] <- 1
 
   # Historical BMIQ clips endpoints to half the distance to the nearest
   # interior observation. Guard the degenerate case where every fit value is
   # 0 (or every value is 1) so min()/max() do not return +/-Inf, and floor the
   # clips at endpoint.eps so a subnormal input cannot round the bound back to
   # an exact 0 or 1 (which would feed log(0) into the mixture fit).
-  y_fit <- as.numeric(beta[rand.idx])
+  y_fit <- beta.fit
   endpoint.eps <- sqrt(.Machine$double.eps)
   positive <- y_fit[y_fit > 0]
   below.one <- y_fit[y_fit < 1]
@@ -481,8 +459,14 @@ fit_mixture <- function(
     paste0(context, " mixture")
   )
 
+  # Flatten the legacy K x 1 matrix shapes once at this boundary so all
+  # downstream R code sees plain numeric vectors.
+  em$a <- as.numeric(em$a[, 1L])
+  em$b <- as.numeric(em$b[, 1L])
+  em$mu <- as.numeric(em$mu[, 1L])
+
   # Components are already canonicalized by increasing mean.
-  component.means <- as.numeric(em$mu[, 1L])
+  component.means <- em$mu
 
   # Diagnostic only: a valid soft component may never win the hard posterior
   # assignment, so do not reject on it. The load-bearing class checks are the
@@ -495,8 +479,8 @@ fit_mixture <- function(
   em$w <- NULL
 
   posterior.thresholds <- density_thresholds(
-    a = as.numeric(em$a[, 1L]),
-    b = as.numeric(em$b[, 1L]),
+    a = em$a,
+    b = em$b,
     eta = as.numeric(em$eta),
     component.means = component.means,
     context = paste0(context, " posterior mixture")
@@ -516,7 +500,7 @@ fit_mixture <- function(
 
   list(
     em = em,
-    random_indices = rand.idx,
+    random_indices = fit.idx,
     initial_class_counts = initial.counts,
     component_means = component.means,
     subset_map_counts = subset.counts,
@@ -533,8 +517,8 @@ em_diagnostics <- function(fit, extra = NULL) {
     initial_class_counts = fit$initial_class_counts,
     eta = em$eta,
     component_means = fit$component_means,
-    component_a = as.numeric(em$a[, 1L]),
-    component_b = as.numeric(em$b[, 1L]),
+    component_a = em$a,
+    component_b = em$b,
     component_fit_status = em$fit_status,
     component_fit_reason = em$fit_reason,
     em_iterations = em$iterations,
@@ -567,6 +551,186 @@ map_beta_q <- function(x, a.sample, b.sample, a.gold, b.gold, lower.tail) {
   )
 }
 
+# Shared validation of the EM settings used by both bmiq_gold_fit() and
+# bmiq_calibration(). Owns the legacy-drift warning so it fires exactly once
+# per user-facing call. Returns the coerced integer settings.
+validate_em_settings <- function(nL, nfit, niter, tol, beta.maxit,
+                                 beta.score.tol) {
+  nL <- as.integer(checkmate::assert_int(nL, lower = 2L, upper = 3L))
+  nfit <- as.integer(checkmate::assert_int(nfit, lower = 2L * nL))
+  niter <- as.integer(checkmate::assert_int(niter, lower = 1L))
+  beta.maxit <- as.integer(checkmate::assert_int(beta.maxit, lower = 1L))
+  checkmate::assert_number(tol, finite = TRUE)
+  checkmate::assert_true(tol > 0, .var.name = "tol")
+  checkmate::assert_number(beta.score.tol, finite = TRUE)
+  checkmate::assert_true(beta.score.tol > 0, .var.name = "beta.score.tol")
+
+  if (nL == 3L && niter > LEGACY_BMIQ_NITER) {
+    warning(
+      "nL = 3 with niter > ", LEGACY_BMIQ_NITER,
+      " is not exactly compatible with legacy ",
+      "five-iteration BMIQ results. This is expected if you intentionally ",
+      "want the three-component fit to run further toward convergence.",
+      call. = FALSE
+    )
+  }
+
+  list(nL = nL, nfit = nfit, niter = niter, beta.maxit = beta.maxit)
+}
+
+# Fit the gold-standard mixture and reduce it to the parameters the per-sample
+# calibration actually consumes. Settings are assumed validated by the caller.
+fit_gold_standard <- function(
+  goldstandard.beta,
+  nL,
+  nfit,
+  th1.v,
+  niter,
+  tol,
+  beta.maxit,
+  beta.score.tol,
+  debug,
+  verbose
+) {
+  goldstandard.beta <- as.numeric(goldstandard.beta)
+  checkmate::assert_numeric(
+    goldstandard.beta,
+    any.missing = FALSE,
+    min.len = 2L * nL,
+    .var.name = "goldstandard.beta"
+  )
+  scan_finite_unit_interval_cpp(
+    goldstandard.beta,
+    name = "goldstandard.beta",
+    require_open = FALSE
+  )
+
+  if (is.null(th1.v)) {
+    th1.v <- if (nL == 2L) 0.5 else c(0.2, 0.75)
+  }
+  check_thresholds(
+    th1.v,
+    nL = nL,
+    name = "th1.v",
+    require.unit.interval = TRUE
+  )
+
+  if (verbose) {
+    message("Fitting EM beta mixture to gold-standard probes")
+  }
+
+  gold.fit <- fit_mixture(
+    beta = goldstandard.beta,
+    thresholds = th1.v,
+    nL = nL,
+    nfit = nfit,
+    niter = niter,
+    tol = tol,
+    beta.maxit = beta.maxit,
+    beta.score.tol = beta.score.tol,
+    context = "Gold-standard",
+    debug = debug
+  )
+
+  unmethylated.mode <- estimate_mode(
+    goldstandard.beta[gold.fit$full_class == 1L],
+    "Gold-standard unmethylated class"
+  )
+  methylated.mode <- estimate_mode(
+    goldstandard.beta[gold.fit$full_class == nL],
+    "Gold-standard methylated class"
+  )
+
+  if (verbose) {
+    message("Gold-standard mixture fit complete")
+  }
+
+  structure(
+    list(
+      a = gold.fit$em$a,
+      b = gold.fit$em$b,
+      thresholds = as.numeric(gold.fit$thresholds),
+      unmethylated.mode = unmethylated.mode,
+      methylated.mode = methylated.mode,
+      nL = nL,
+      diagnostics = if (debug) {
+        em_diagnostics(
+          gold.fit,
+          extra = list(
+            unmethylated_mode = unmethylated.mode,
+            methylated_mode = methylated.mode
+          )
+        )
+      } else {
+        NULL
+      },
+      settings = list(
+        nfit = nfit,
+        th1.v = th1.v,
+        niter = niter,
+        tol = tol,
+        beta.maxit = beta.maxit,
+        beta.score.tol = beta.score.tol
+      )
+    ),
+    class = "bmiq_gold_fit"
+  )
+}
+
+#' Fit the BMIQ Gold-Standard Beta Mixture Once
+#'
+#' Fits the gold-standard beta mixture used by [bmiq_calibration()] and
+#' returns the fitted parameters. The gold standard is consumed purely
+#' distributionally (fitted component shapes, density-crossing thresholds,
+#' and the two class density modes) -- there is no per-probe alignment with
+#' the matrix being calibrated. Fit it once with this function and pass the
+#' result as `goldstandard.beta` to any number of [bmiq_calibration()] calls
+#' (for example when calibrating a large matrix in chunks) instead of
+#' refitting the same gold vector each time.
+#'
+#' @inheritParams bmiq_calibration
+#' @param goldstandard.beta Numeric vector of gold-standard betas. Values
+#'   must be finite, non-missing, and in \eqn{[0, 1]}; at least `2 * nL`
+#'   values are required.
+#'
+#' @return An object of class `bmiq_gold_fit` with the fitted component
+#'   shapes (`a`, `b`), the density-crossing `thresholds`, the class density
+#'   modes (`unmethylated.mode`, `methylated.mode`), the `nL` used, fit
+#'   `diagnostics` when `debug = TRUE` (else `NULL`), and the fit `settings`.
+#'
+#' @export
+bmiq_gold_fit <- function(
+  goldstandard.beta,
+  nL = 3L,
+  nfit = 20000L,
+  th1.v = NULL,
+  niter = LEGACY_BMIQ_NITER,
+  tol = 0.001,
+  beta.maxit = 50L,
+  beta.score.tol = 1e-10,
+  debug = FALSE,
+  verbose = TRUE
+) {
+  checkmate::assert_flag(debug)
+  checkmate::assert_flag(verbose)
+  settings <- validate_em_settings(
+    nL, nfit, niter, tol, beta.maxit, beta.score.tol
+  )
+
+  fit_gold_standard(
+    goldstandard.beta,
+    nL = settings$nL,
+    nfit = settings$nfit,
+    th1.v = th1.v,
+    niter = settings$niter,
+    tol = tol,
+    beta.maxit = settings$beta.maxit,
+    beta.score.tol = beta.score.tol,
+    debug = debug,
+    verbose = verbose
+  )
+}
+
 #' Calibrate Methylation Beta Values Against a Gold Standard
 #'
 #' BMIQ-style calibration of DNA methylation beta values to a gold-standard
@@ -575,8 +739,11 @@ map_beta_q <- function(x, a.sample, b.sample, a.gold, b.gold, lower.tail) {
 #'
 #' @param datM Numeric matrix of beta values: samples in rows, CpGs in
 #'   columns. Values must be finite, non-missing, and in \eqn{[0, 1]}.
-#' @param goldstandard.beta Numeric vector of gold-standard betas, one per
-#'   column of `datM`.
+#' @param goldstandard.beta Numeric vector of gold-standard betas, or a
+#'   prefitted [bmiq_gold_fit()] object. The gold standard is consumed purely
+#'   distributionally, so the vector does not need to align with (or match
+#'   the length of) the columns of `datM`; a prefitted object lets one gold
+#'   fit be reused across multiple calls.
 #' @param nL Number of mixture components: `3` for unmethylated /
 #'   intermediate / methylated (default, legacy three-state BMIQ), or `2`
 #'   for unmethylated / methylated only. Choose `nL` by whether the
@@ -588,7 +755,9 @@ map_beta_q <- function(x, a.sample, b.sample, a.gold, b.gold, lower.tail) {
 #'   Default is `TRUE` when `nL = 3` and `FALSE` when `nL = 2`.
 #' @param nfit Maximum number of probes used when fitting each mixture.
 #' @param th1.v Initial gold-standard class boundaries (length `nL - 1`).
-#'   Defaults to `c(0.2, 0.75)` for `nL = 3` and `0.5` for `nL = 2`.
+#'   Defaults to `c(0.2, 0.75)` for `nL = 3` and `0.5` for `nL = 2`. Only
+#'   used when fitting the gold standard, so it is ignored when
+#'   `goldstandard.beta` is a prefitted [bmiq_gold_fit()] object.
 #' @param niter Maximum outer EM iterations for the gold-standard fit and
 #'   each sample fit. Default `5` is a legacy-compatibility setting matching
 #'   common three-state BMIQ pipelines. Raising `niter` above `5` with
@@ -677,7 +846,7 @@ bmiq_calibration <- function(
   doH = NULL,
   nfit = 20000L,
   th1.v = NULL,
-  niter = 5L,
+  niter = LEGACY_BMIQ_NITER,
   tol = 0.001,
   beta.maxit = 50L,
   beta.score.tol = 1e-10,
@@ -704,19 +873,14 @@ bmiq_calibration <- function(
   )
   storage.mode(datM) <- "double"
 
-  goldstandard.beta <- as.numeric(goldstandard.beta)
-  checkmate::assert_numeric(
-    goldstandard.beta,
-    any.missing = FALSE,
-    len = ncol(datM),
-    .var.name = "goldstandard.beta"
+  settings <- validate_em_settings(
+    nL, nfit, niter, tol, beta.maxit, beta.score.tol
   )
+  nL <- settings$nL
+  nfit <- settings$nfit
+  niter <- settings$niter
+  beta.maxit <- settings$beta.maxit
 
-  nL <- as.integer(checkmate::assert_int(nL, lower = 2L, upper = 3L))
-
-  if (is.null(th1.v)) {
-    th1.v <- if (nL == 2L) 0.5 else c(0.2, 0.75)
-  }
   if (is.null(doH)) {
     doH <- nL == 3L
   } else {
@@ -729,36 +893,7 @@ bmiq_calibration <- function(
     }
   }
 
-  nfit <- as.integer(checkmate::assert_int(nfit, lower = 2L * nL))
-  niter <- as.integer(checkmate::assert_int(niter, lower = 1L))
-  beta.maxit <- as.integer(checkmate::assert_int(beta.maxit, lower = 1L))
-  checkmate::assert_number(tol, lower = 0, finite = TRUE)
-  checkmate::assert_true(tol > 0, .var.name = "tol")
-  checkmate::assert_number(beta.score.tol, lower = 0, finite = TRUE)
-  checkmate::assert_true(beta.score.tol > 0, .var.name = "beta.score.tol")
-
-  if (nL == 3L && niter > 5L) {
-    warning(
-      "nL = 3 with niter > 5 is not exactly compatible with legacy ",
-      "five-iteration BMIQ results. This is expected if you intentionally ",
-      "want the three-component fit to run further toward convergence.",
-      call. = FALSE
-    )
-  }
-
-  check_thresholds(
-    th1.v,
-    nL = nL,
-    name = "th1.v",
-    require.unit.interval = TRUE
-  )
-
   scan_finite_unit_interval_cpp(datM, name = "datM", require_open = FALSE)
-  scan_finite_unit_interval_cpp(
-    matrix(goldstandard.beta, ncol = 1L),
-    name = "goldstandard.beta",
-    require_open = FALSE
-  )
 
   number.of.samples <- nrow(datM)
   number.of.probes <- ncol(datM)
@@ -799,58 +934,50 @@ bmiq_calibration <- function(
     NULL
   }
 
-  beta1.v <- goldstandard.beta
-
-  if (verbose) {
-    message("Fitting EM beta mixture to gold-standard probes")
-  }
-
-  gold.fit <- fit_mixture(
-    beta = beta1.v,
-    thresholds = th1.v,
-    nL = nL,
-    nfit = nfit,
-    niter = niter,
-    tol = tol,
-    beta.maxit = beta.maxit,
-    beta.score.tol = beta.score.tol,
-    context = "Gold-standard",
-    debug = debug
-  )
-
-  em1.o <- gold.fit$em
-  nth1.v <- gold.fit$thresholds
-
-  # Hoist the gold-standard shapes and thresholds out of the per-sample loop;
-  # they are constant across samples.
-  gold.a <- as.numeric(em1.o$a[, 1L])
-  gold.b <- as.numeric(em1.o$b[, 1L])
-  gold.thresholds <- as.numeric(nth1.v)
-
-  mod1U <- estimate_mode(
-    beta1.v[gold.fit$full_class == 1L],
-    "Gold-standard unmethylated class"
-  )
-  mod1M <- estimate_mode(
-    beta1.v[gold.fit$full_class == nL],
-    "Gold-standard methylated class"
-  )
-
-  gold.diagnostics <- if (debug) {
-    em_diagnostics(
-      gold.fit,
-      extra = list(
-        unmethylated_mode = mod1U,
-        methylated_mode = mod1M
+  # The gold standard is consumed purely distributionally, so a prefitted
+  # bmiq_gold_fit object can stand in for the raw vector and be reused across
+  # calls (e.g. chunked calibration of one large matrix).
+  if (inherits(goldstandard.beta, "bmiq_gold_fit")) {
+    if (goldstandard.beta$nL != nL) {
+      stop(
+        "goldstandard.beta was fitted with nL = ",
+        goldstandard.beta$nL,
+        " but this call requested nL = ",
+        nL,
+        ".",
+        call. = FALSE
       )
-    )
+    }
+    gold <- goldstandard.beta
   } else {
-    NULL
+    gold <- fit_gold_standard(
+      goldstandard.beta,
+      nL = nL,
+      nfit = nfit,
+      th1.v = th1.v,
+      niter = niter,
+      tol = tol,
+      beta.maxit = beta.maxit,
+      beta.score.tol = beta.score.tol,
+      debug = debug,
+      verbose = verbose
+    )
   }
 
-  if (verbose) {
-    message("Gold-standard mixture fit complete")
-  }
+  gold.a <- gold$a
+  gold.b <- gold$b
+  gold.thresholds <- gold$thresholds
+  mod1U <- gold$unmethylated.mode
+  mod1M <- gold$methylated.mode
+  gold.diagnostics <- if (debug) gold$diagnostics else NULL
+
+  # The fit subset is identical for every sample (same probe count, nfit, and
+  # seed), so draw it once for the whole loop.
+  sample.fit.idx <- draw_fit_indices(
+    number.of.probes,
+    min(nfit, number.of.probes),
+    seed = 1L
+  )
 
   process_sample <- function(ii, beta2.v) {
     beta2.v <- as.numeric(beta2.v)
@@ -871,17 +998,17 @@ bmiq_calibration <- function(
       {
         stage <- "sample mode estimation"
 
-        low.mode.values <- beta2.v[beta2.v < 0.4]
-        high.mode.values <- beta2.v[beta2.v > 0.6]
+        low.mode.values <- beta2.v[beta2.v < MODE_WINDOW_LOW]
+        high.mode.values <- beta2.v[beta2.v > MODE_WINDOW_HIGH]
 
         mod2U <- estimate_mode(
           low.mode.values,
-          paste0("Sample ", ii, " values below 0.4")
+          paste0("Sample ", ii, " values below ", MODE_WINDOW_LOW)
         )
 
         mod2M <- estimate_mode(
           high.mode.values,
-          paste0("Sample ", ii, " values above 0.6")
+          paste0("Sample ", ii, " values above ", MODE_WINDOW_HIGH)
         )
 
         if (debug) {
@@ -940,7 +1067,8 @@ bmiq_calibration <- function(
           beta.maxit = beta.maxit,
           beta.score.tol = beta.score.tol,
           context = paste0("Sample ", ii),
-          debug = debug
+          debug = debug,
+          fit.idx = sample.fit.idx
         )
 
         em2.o <- sample.fit$em
@@ -959,22 +1087,28 @@ bmiq_calibration <- function(
 
         U <- 1L
         M <- nL
-        # Assign every U/M observation to exactly one tail; values exactly at
-        # a component mean must not be left unnormalized.
-        selU.idx <- which(class2.v == U)
-        selUL.idx <- selU.idx[beta2.v[selU.idx] <= classAV2.v[U]]
-        selUR.idx <- selU.idx[beta2.v[selU.idx] > classAV2.v[U]]
-        selM.idx <- which(class2.v == M)
-        selML.idx <- selM.idx[beta2.v[selM.idx] < classAV2.v[M]]
-        selMR.idx <- selM.idx[beta2.v[selM.idx] >= classAV2.v[M]]
+
+        # The tail split drives the nL = 3 maps and the H step; for nL = 2 it
+        # is needed only for the debug tail-count diagnostic, so skip the
+        # full-length passes on the plain nL = 2 path.
+        if (nL == 3L || debug) {
+          # Assign every U/M observation to exactly one tail; values exactly
+          # at a component mean must not be left unnormalized.
+          selU.idx <- which(class2.v == U)
+          selUL.idx <- selU.idx[beta2.v[selU.idx] <= classAV2.v[U]]
+          selUR.idx <- selU.idx[beta2.v[selU.idx] > classAV2.v[U]]
+          selM.idx <- which(class2.v == M)
+          selML.idx <- selM.idx[beta2.v[selM.idx] < classAV2.v[M]]
+          selMR.idx <- selM.idx[beta2.v[selM.idx] >= classAV2.v[M]]
+        }
 
         if (nL == 2L) {
           stage <- "nL=2 truncated U/M quantile normalization"
           nbeta2.v <- normalize_nl2(
             beta = beta2.v,
             class = class2.v,
-            sample.a = as.numeric(em2.o$a[, 1L]),
-            sample.b = as.numeric(em2.o$b[, 1L]),
+            sample.a = em2.o$a,
+            sample.b = em2.o$b,
             gold.a = gold.a,
             gold.b = gold.b,
             sample.threshold = sample.fit$thresholds[1L],
@@ -991,7 +1125,7 @@ bmiq_calibration <- function(
           if (length(selUL.idx)) {
             nbeta2.v[selUL.idx] <- map_beta_q(
               beta2.v[selUL.idx],
-              em2.o$a[U, 1L], em2.o$b[U, 1L],
+              em2.o$a[U], em2.o$b[U],
               gold.a[U], gold.b[U],
               lower.tail = TRUE
             )
@@ -1000,7 +1134,7 @@ bmiq_calibration <- function(
           if (length(selUR.idx)) {
             nbeta2.v[selUR.idx] <- map_beta_q(
               beta2.v[selUR.idx],
-              em2.o$a[U, 1L], em2.o$b[U, 1L],
+              em2.o$a[U], em2.o$b[U],
               gold.a[U], gold.b[U],
               lower.tail = FALSE
             )
@@ -1011,7 +1145,7 @@ bmiq_calibration <- function(
           if (length(selMR.idx)) {
             nbeta2.v[selMR.idx] <- map_beta_q(
               beta2.v[selMR.idx],
-              em2.o$a[M, 1L], em2.o$b[M, 1L],
+              em2.o$a[M], em2.o$b[M],
               gold.a[M], gold.b[M],
               lower.tail = FALSE
             )
@@ -1132,10 +1266,6 @@ bmiq_calibration <- function(
         )
       },
       error = function(error) {
-        if (inherits(error, "bmiq_sample_error")) {
-          stop(error)
-        }
-
         if (debug) {
           diagnostic$success <- FALSE
           diagnostic$failure_stage <- stage

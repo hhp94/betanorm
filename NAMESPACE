@@ -3,6 +3,7 @@
 S3method(as.matrix,bmiq_calibration_result)
 S3method(print,bmiq_calibration_result)
 export(bmiq_calibration)
+export(bmiq_gold_fit)
 export(quantile_norm)
 importFrom(Rcpp,sourceCpp)
 importFrom(stats,dbeta)

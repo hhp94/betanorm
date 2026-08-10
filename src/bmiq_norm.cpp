@@ -1,12 +1,11 @@
-#include <RcppArmadillo.h>
+#include <Rcpp.h>
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <limits>
 #include <string>
 #include <vector>
-
-// [[Rcpp::depends(RcppArmadillo)]]
 
 namespace
 {
@@ -19,7 +18,6 @@ namespace
         double m2 = 0.0;
         double sum_log_y = 0.0;
         double sum_log1m_y = 0.0;
-        arma::uword positive_count = 0;
 
         void add(
             double y,
@@ -31,8 +29,6 @@ namespace
             {
                 return;
             }
-
-            ++positive_count;
 
             const double new_weight = weight + effective_weight;
             const double delta = y - mean;
@@ -47,8 +43,9 @@ namespace
         }
 
         // Kish effective sample size: (sum w)^2 / sum w^2. A soft E-step gives
-        // almost every observation a positive but negligible responsibility, so
-        // positive_count is a poor size guard; n_eff is not.
+        // almost every observation a positive but negligible responsibility,
+        // so a raw count of contributing observations is a poor size guard;
+        // n_eff is not.
         double effective_size() const
         {
             if (!(sum_w2 > 0.0))
@@ -71,6 +68,16 @@ namespace
         std::string reason = "unknown failure";
     };
 
+    // Log of the Beta normalizing constant, -log B(a, b). Shared by the
+    // component log-likelihood and the E-step prior so the two sites cannot
+    // drift numerically.
+    inline double log_beta_norm(double a, double b)
+    {
+        return std::lgamma(a + b) -
+               std::lgamma(a) -
+               std::lgamma(b);
+    }
+
     inline double beta_loglik_stats(
         double a,
         double b,
@@ -78,10 +85,7 @@ namespace
     {
         return (a - 1.0) * stats.sum_log_y +
                (b - 1.0) * stats.sum_log1m_y +
-               stats.weight *
-                   (std::lgamma(a + b) -
-                    std::lgamma(a) -
-                    std::lgamma(b));
+               stats.weight * log_beta_norm(a, b);
     }
 
     inline void set_beta_fit(
@@ -162,7 +166,8 @@ namespace
         // Sufficient statistics are fixed for this MLE; only digamma/trigamma
         // of the shapes change across Newton steps.
         const double mean_log_y = stats.sum_log_y / stats.weight;
-        const double mean_log1m_y = stats.sum_log1m_y / stats.weight;
+        const double mean_log1m_y =
+            stats.sum_log1m_y / stats.weight;
 
         for (int iter = 0; iter < maxit; ++iter)
         {
@@ -175,7 +180,8 @@ namespace
                 mean_log1m_y - R::digamma(b) + digamma_ab;
 
             const double scaled_score =
-                std::max(std::abs(a * score_a), std::abs(b * score_b));
+                std::max(std::abs(a * score_a),
+                         std::abs(b * score_b));
 
             if (scaled_score <= score_tol)
             {
@@ -191,7 +197,8 @@ namespace
             const double i12 = -trigamma_ab;
             const double determinant = i11 * i22 - i12 * i12;
 
-            if (!(determinant > 0.0) || !std::isfinite(determinant))
+            if (!(determinant > 0.0) ||
+                !std::isfinite(determinant))
             {
                 set_beta_fit(
                     out, a, b, loglik, iter, true, false, "stalled",
@@ -232,16 +239,21 @@ namespace
                     std::isfinite(new_a) &&
                     std::isfinite(new_b))
                 {
-                    new_loglik = beta_loglik_stats(new_a, new_b, stats);
+                    new_loglik =
+                        beta_loglik_stats(new_a, new_b, stats);
+
                     if (std::isfinite(new_loglik) &&
                         new_loglik >=
                             loglik +
-                                armijo * step * directional_derivative)
+                                armijo *
+                                    step *
+                                    directional_derivative)
                     {
                         accepted = true;
                         break;
                     }
                 }
+
                 step *= 0.5;
             }
 
@@ -261,21 +273,23 @@ namespace
         set_beta_fit(
             out, a, b, loglik, maxit, true, false, "max_iter",
             "maximum iterations reached");
+
         return out;
     }
 
 } // anonymous namespace
 
+// NumericVector deliberately accepts both vectors and numeric matrices.
 // [[Rcpp::export]]
 void scan_finite_unit_interval_cpp(
-    const arma::mat &x,
+    const Rcpp::NumericVector &x,
     std::string name = "x",
     bool require_open = false)
 {
-    const double *data = x.memptr();
-    const arma::uword n = x.n_elem;
+    const double *data = REAL(x);
+    const R_xlen_t n = x.size();
 
-    for (arma::uword i = 0; i < n; ++i)
+    for (R_xlen_t i = 0; i < n; ++i)
     {
         const double value = data[i];
 
@@ -396,8 +410,8 @@ void scatter_sample_block_cpp(
 
 // [[Rcpp::export]]
 Rcpp::List beta_mixture_em_cpp(
-    const arma::vec &y,
-    const arma::mat &initial_responsibility,
+    const Rcpp::NumericVector &y,
+    const Rcpp::NumericMatrix &initial_responsibility,
     int nL = 3,
     int maxiter = 25,
     double tol = 1e-6,
@@ -413,45 +427,87 @@ Rcpp::List beta_mixture_em_cpp(
         Rcpp::stop("nL must be 2 or 3");
     }
 
-    const arma::uword K = static_cast<arma::uword>(nL);
-    const arma::uword n = y.n_elem;
-    const arma::uword n_param = 3 * K;
+    const R_xlen_t K = static_cast<R_xlen_t>(nL);
+    const R_xlen_t n = y.size();
+    const R_xlen_t n_param = 3 * K;
     const double n_obs = static_cast<double>(n);
 
-    if (initial_responsibility.n_rows != n ||
-        initial_responsibility.n_cols != K)
+    if (static_cast<R_xlen_t>(
+            initial_responsibility.nrow()) != n ||
+        initial_responsibility.ncol() != nL)
     {
         Rcpp::stop(
             "initial_responsibility must be n x nL "
             "(n = length(y))");
     }
 
-    arma::vec log_y(n);
-    arma::vec log1m_y(n);
-    for (arma::uword i = 0; i < n; ++i)
+    const double *y_ptr = REAL(y);
+
+    std::vector<double> log_y(
+        static_cast<std::size_t>(n));
+    std::vector<double> log1m_y(
+        static_cast<std::size_t>(n));
+
+    for (R_xlen_t i = 0; i < n; ++i)
     {
-        log_y[i] = std::log(y[i]);
-        log1m_y[i] = std::log1p(-y[i]);
+        const double value = y_ptr[i];
+
+        // Own the EM's precondition here rather than relying on callers'
+        // clipping: a boundary value would otherwise surface much later as an
+        // obscure non-finite likelihood error.
+        if (!(value > 0.0 && value < 1.0))
+        {
+            Rcpp::stop(
+                "y must lie strictly inside (0, 1) "
+                "for the Beta mixture EM");
+        }
+
+        log_y[i] = std::log(value);
+        log1m_y[i] = std::log1p(-value);
     }
 
-    arma::mat responsibility = initial_responsibility;
+    // Allocate and copy rather than assigning the NumericMatrix directly.
+    // Direct assignment aliases the caller's SEXP and the E-step would mutate
+    // initial_responsibility. A fresh allocation also mirrors Armadillo's
+    // attribute-dropping deep copy more closely than Rcpp::clone().
+    Rcpp::NumericMatrix responsibility(
+        initial_responsibility.nrow(),
+        initial_responsibility.ncol());
 
-    arma::vec a(K, arma::fill::ones);
-    arma::vec b(K, arma::fill::ones);
-    arma::vec eta(K, arma::fill::zeros);
-    arma::vec mu(K, arma::fill::zeros);
+    std::copy(
+        initial_responsibility.begin(),
+        initial_responsibility.end(),
+        responsibility.begin());
 
-    arma::vec param_state(n_param);
-    arma::vec old_param_state(n_param);
-    old_param_state.fill(arma::datum::inf);
+    double *responsibility_ptr = REAL(responsibility);
 
-    arma::vec log_component(K);
-    arma::vec log_norm(K);
-    arma::vec log_prior(K);
-    arma::vec am1(K);
-    arma::vec bm1(K);
-    arma::vec prev_a(K);
-    arma::vec prev_b(K);
+    std::vector<double> a(
+        static_cast<std::size_t>(K), 1.0);
+    std::vector<double> b(
+        static_cast<std::size_t>(K), 1.0);
+    std::vector<double> eta(
+        static_cast<std::size_t>(K), 0.0);
+    std::vector<double> mu(
+        static_cast<std::size_t>(K), 0.0);
+
+    std::vector<double> param_state(
+        static_cast<std::size_t>(n_param), 0.0);
+    std::vector<double> old_param_state(
+        static_cast<std::size_t>(n_param),
+        std::numeric_limits<double>::infinity());
+
+    std::vector<double> log_component(
+        static_cast<std::size_t>(K), 0.0);
+    std::vector<double> log_prior(
+        static_cast<std::size_t>(K), 0.0);
+    std::vector<double> am1(
+        static_cast<std::size_t>(K), 0.0);
+    std::vector<double> bm1(
+        static_cast<std::size_t>(K), 0.0);
+    std::vector<double> prev_a(
+        static_cast<std::size_t>(K), 0.0);
+    std::vector<double> prev_b(
+        static_cast<std::size_t>(K), 0.0);
 
     Rcpp::CharacterVector fit_status(nL);
     Rcpp::CharacterVector fit_reason(nL);
@@ -480,21 +536,22 @@ Rcpp::List beta_mixture_em_cpp(
 
         // One pass: component weights (eta) and Beta sufficient stats.
         // stats[k].weight == sum_i responsibility(i, k).
-        std::vector<BetaStats> stats(K);
+        std::vector<BetaStats> stats(
+            static_cast<std::size_t>(K));
 
-        for (arma::uword i = 0; i < n; ++i)
+        for (R_xlen_t i = 0; i < n; ++i)
         {
-            for (arma::uword k = 0; k < K; ++k)
+            for (R_xlen_t k = 0; k < K; ++k)
             {
                 stats[k].add(
-                    y[i],
+                    y_ptr[i],
                     log_y[i],
                     log1m_y[i],
-                    responsibility(i, k));
+                    responsibility_ptr[i + n * k]);
             }
         }
 
-        for (arma::uword k = 0; k < K; ++k)
+        for (R_xlen_t k = 0; k < K; ++k)
         {
             eta[k] = stats[k].weight / n_obs;
 
@@ -533,10 +590,15 @@ Rcpp::List beta_mixture_em_cpp(
             // always the closed-form maximizer, so guarding the Beta shapes is
             // enough to keep the outer log-likelihood non-decreasing.
             bool retained = false;
+
             if (iter > 0)
             {
                 const double prev_loglik =
-                    beta_loglik_stats(prev_a[k], prev_b[k], stats[k]);
+                    beta_loglik_stats(
+                        prev_a[k],
+                        prev_b[k],
+                        stats[k]);
+
                 if (std::isfinite(prev_loglik) &&
                     prev_loglik > fit.loglik)
                 {
@@ -560,28 +622,22 @@ Rcpp::List beta_mixture_em_cpp(
 
             mu[k] = a[k] / (a[k] + b[k]);
 
-            log_norm[k] =
-                std::lgamma(a[k] + b[k]) -
-                std::lgamma(a[k]) -
-                std::lgamma(b[k]);
-        }
-
-        // E-step terms independent of observation index i.
-        for (arma::uword k = 0; k < K; ++k)
-        {
-            log_prior[k] = std::log(eta[k]) + log_norm[k];
+            // E-step terms independent of observation index i; eta[k], a[k],
+            // and b[k] are final for this iteration at this point.
+            log_prior[k] =
+                std::log(eta[k]) + log_beta_norm(a[k], b[k]);
             am1[k] = a[k] - 1.0;
             bm1[k] = b[k] - 1.0;
         }
 
         loglikelihood = 0.0;
 
-        for (arma::uword i = 0; i < n; ++i)
+        for (R_xlen_t i = 0; i < n; ++i)
         {
             double maximum =
                 -std::numeric_limits<double>::infinity();
 
-            for (arma::uword k = 0; k < K; ++k)
+            for (R_xlen_t k = 0; k < K; ++k)
             {
                 log_component[k] =
                     log_prior[k] +
@@ -594,7 +650,7 @@ Rcpp::List beta_mixture_em_cpp(
 
             double sum_exp = 0.0;
 
-            for (arma::uword k = 0; k < K; ++k)
+            for (R_xlen_t k = 0; k < K; ++k)
             {
                 sum_exp +=
                     std::exp(log_component[k] - maximum);
@@ -612,29 +668,41 @@ Rcpp::List beta_mixture_em_cpp(
 
             loglikelihood += log_mixture;
 
-            for (arma::uword k = 0; k < K; ++k)
+            for (R_xlen_t k = 0; k < K; ++k)
             {
-                responsibility(i, k) =
+                responsibility_ptr[i + n * k] =
                     std::exp(
                         log_component[k] - log_mixture);
             }
         }
 
-        for (arma::uword k = 0; k < K; ++k)
+        for (R_xlen_t k = 0; k < K; ++k)
         {
             param_state[3 * k] = std::log(a[k]);
             param_state[3 * k + 1] = std::log(b[k]);
             param_state[3 * k + 2] = eta[k];
         }
 
-        parameter_criterion =
-            arma::max(arma::abs(param_state - old_param_state));
+        parameter_criterion = 0.0;
+
+        for (R_xlen_t j = 0; j < n_param; ++j)
+        {
+            parameter_criterion =
+                std::max(
+                    parameter_criterion,
+                    std::abs(
+                        param_state[j] -
+                        old_param_state[j]));
+        }
 
         if (std::isfinite(previous_loglikelihood))
         {
             loglik_criterion =
-                std::abs(loglikelihood - previous_loglikelihood) /
-                (1.0 + std::abs(previous_loglikelihood));
+                std::abs(
+                    loglikelihood -
+                    previous_loglikelihood) /
+                (1.0 +
+                 std::abs(previous_loglikelihood));
         }
         else
         {
@@ -646,7 +714,8 @@ Rcpp::List beta_mixture_em_cpp(
         {
             parameter_criterion_trace.push_back(
                 parameter_criterion);
-            loglik_criterion_trace.push_back(loglik_criterion);
+            loglik_criterion_trace.push_back(
+                loglik_criterion);
         }
 
         completed_iterations = iter + 1;
@@ -662,25 +731,39 @@ Rcpp::List beta_mixture_em_cpp(
         }
     }
 
-    arma::mat a_matrix(K, 1);
-    arma::mat b_matrix(K, 1);
-    arma::mat mu_matrix(K, 1);
+    // Preserve the old RcppArmadillo return shapes:
+    // a, b, and mu are K x 1 matrices; eta is a bare vector.
+    Rcpp::NumericMatrix a_matrix(nL, 1);
+    Rcpp::NumericMatrix b_matrix(nL, 1);
+    Rcpp::NumericMatrix mu_matrix(nL, 1);
+    Rcpp::NumericVector eta_vector(nL);
 
-    a_matrix.col(0) = a;
-    b_matrix.col(0) = b;
-    mu_matrix.col(0) = mu;
+    double *a_matrix_ptr = REAL(a_matrix);
+    double *b_matrix_ptr = REAL(b_matrix);
+    double *mu_matrix_ptr = REAL(mu_matrix);
+    double *eta_vector_ptr = REAL(eta_vector);
+
+    for (R_xlen_t k = 0; k < K; ++k)
+    {
+        a_matrix_ptr[k] = a[k];
+        b_matrix_ptr[k] = b[k];
+        mu_matrix_ptr[k] = mu[k];
+        eta_vector_ptr[k] = eta[k];
+    }
 
     Rcpp::List result = Rcpp::List::create(
         Rcpp::_["a"] = a_matrix,
         Rcpp::_["b"] = b_matrix,
-        Rcpp::_["eta"] = eta,
+        Rcpp::_["eta"] = eta_vector,
         Rcpp::_["mu"] = mu_matrix,
         Rcpp::_["w"] = responsibility,
         Rcpp::_["llike"] = loglikelihood,
         Rcpp::_["iterations"] = completed_iterations,
         Rcpp::_["converged"] = converged,
-        Rcpp::_["parameter_criterion"] = parameter_criterion,
-        Rcpp::_["loglik_criterion"] = loglik_criterion,
+        Rcpp::_["parameter_criterion"] =
+            parameter_criterion,
+        Rcpp::_["loglik_criterion"] =
+            loglik_criterion,
         Rcpp::_["fit_status"] = fit_status,
         Rcpp::_["fit_reason"] = fit_reason,
         Rcpp::_["nL"] = nL);

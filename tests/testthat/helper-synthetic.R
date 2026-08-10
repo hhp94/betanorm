@@ -28,12 +28,10 @@ simulate_beta_mixture <- function(
   clip01(y)
 }
 
-#' Hard one-hot responsibilities from ordered thresholds.
+#' Hard one-hot responsibilities from ordered thresholds. Classing reuses the
+#' package's own rule so test setup cannot drift from production semantics.
 hard_responsibility <- function(y, thresholds, nL = 3L) {
-  class <- rep.int(1L, length(y))
-  for (boundary in seq_along(thresholds)) {
-    class[y > thresholds[boundary]] <- boundary + 1L
-  }
+  class <- betanorm:::class_by_thresh(y, thresholds)
   w <- matrix(0, nrow = length(y), ncol = nL)
   w[cbind(seq_along(y), class)] <- 1
   w

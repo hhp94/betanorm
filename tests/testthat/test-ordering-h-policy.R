@@ -76,7 +76,8 @@ mock_h_failure <- function(real) {
            beta.score.tol,
            context,
            debug = FALSE,
-           seed = 1L) {
+           seed = 1L,
+           fit.idx = NULL) {
     fit <- real(
       beta = beta,
       thresholds = thresholds,
@@ -88,7 +89,8 @@ mock_h_failure <- function(real) {
       beta.score.tol = beta.score.tol,
       context = context,
       debug = debug,
-      seed = seed
+      seed = seed,
+      fit.idx = fit.idx
     )
     if (grepl("^Sample", context) && nL == 3L) {
       fit$component_means <- c(0.15, 0.5, 1.5)

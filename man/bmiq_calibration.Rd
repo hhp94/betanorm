@@ -13,11 +13,10 @@ bmiq_calibration(
   doH = NULL,
   nfit = 20000L,
   th1.v = NULL,
-  niter = 5L,
+  niter = LEGACY_BMIQ_NITER,
   tol = 0.001,
   beta.maxit = 50L,
   beta.score.tol = 1e-10,
-  fit.policy = c("usable", "converged"),
   h.policy = c("optional", "require"),
   on.sample.error = c("stop", "continue"),
   failed.sample = c("NA", "original"),
@@ -33,8 +32,11 @@ bmiq_calibration(
 \item{datM}{Numeric matrix of beta values: samples in rows, CpGs in
 columns. Values must be finite, non-missing, and in \eqn{[0, 1]}.}
 
-\item{goldstandard.beta}{Numeric vector of gold-standard betas, one per
-column of \code{datM}.}
+\item{goldstandard.beta}{Numeric vector of gold-standard betas, or a
+prefitted \code{\link[=bmiq_gold_fit]{bmiq_gold_fit()}} object. The gold standard is consumed purely
+distributionally, so the vector does not need to align with (or match
+the length of) the columns of \code{datM}; a prefitted object lets one gold
+fit be reused across multiple calls.}
 
 \item{nL}{Number of mixture components: \code{3} for unmethylated /
 intermediate / methylated (default, legacy three-state BMIQ), or \code{2}
@@ -50,7 +52,9 @@ Default is \code{TRUE} when \code{nL = 3} and \code{FALSE} when \code{nL = 2}.}
 \item{nfit}{Maximum number of probes used when fitting each mixture.}
 
 \item{th1.v}{Initial gold-standard class boundaries (length \code{nL - 1}).
-Defaults to \code{c(0.2, 0.75)} for \code{nL = 3} and \code{0.5} for \code{nL = 2}.}
+Defaults to \code{c(0.2, 0.75)} for \code{nL = 3} and \code{0.5} for \code{nL = 2}. Only
+used when fitting the gold standard, so it is ignored when
+\code{goldstandard.beta} is a prefitted \code{\link[=bmiq_gold_fit]{bmiq_gold_fit()}} object.}
 
 \item{niter}{Maximum outer EM iterations for the gold-standard fit and
 each sample fit. Default \code{5} is a legacy-compatibility setting matching
@@ -64,13 +68,6 @@ convergence is otherwise a valid choice.}
 \item{beta.maxit}{Maximum iterations for each Beta-component fit.}
 
 \item{beta.score.tol}{Convergence tolerance for each Beta-component fit.}
-
-\item{fit.policy}{How strict mixture convergence must be.
-\itemize{
-\item \code{"usable"} (default): accept finite component fits even if not fully
-converged.
-\item \code{"converged"}: require full mixture and component convergence.
-}}
 
 \item{h.policy}{What to do if intermediate (H) normalization fails when
 \code{doH = TRUE}.
@@ -127,9 +124,12 @@ the intentional legacy configuration for clock-style and other pipelines
 that expect historical BMIQ behavior: the five-iteration cap is a
 compatibility choice, not a claim of statistical convergence. Either the
 two- or three-component model can be run further toward convergence by
-raising \code{niter} (and tightening \code{fit.policy} as needed); with \code{nL = 3}
-this emits a warning only because the output then departs from legacy
-five-iteration results.
+raising \code{niter}; with \code{nL = 3} this emits a warning only because the output
+then departs from legacy five-iteration results. Component fits are always
+accepted when finite (the mixture is fit with a generalized-EM ascent guard
+so accepting an unconverged component cannot decrease the log-likelihood);
+per-component convergence status is reported in \code{diagnostics} when
+\code{debug = TRUE}.
 
 With \code{nL = 3}, samples are fit as unmethylated (U), intermediate (H), and
 methylated (M) components, then quantile-normalized to the gold standard
