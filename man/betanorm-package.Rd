@@ -24,5 +24,14 @@ Authors:
   \item Hung Pham \email{amser.hoanghung@gmail.com} (\href{https://orcid.org/0000-0002-8271-9355}{ORCID}) [copyright holder]
 }
 
+Other contributors:
+\itemize{
+  \item Ben Bolstad (quantile normalization, derived from preprocessCore (LGPL >= 2)) [copyright holder]
+  \item E. Andres Houseman (beta-mixture EM, derived from RPMM (GPL >= 2)) [copyright holder]
+  \item Devin C. Koestler (beta-mixture EM, derived from RPMM (GPL >= 2)) [copyright holder]
+  \item Andrew E. Teschendorff (BMIQ calibration, derived from BMIQ v1.2) [copyright holder]
+  \item Steve Horvath (BMIQ calibration and beta-mixture EM, derived from BMIQcalibration (CC BY 2.0)) [copyright holder]
+}
+
 }
 \keyword{internal}

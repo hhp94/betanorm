@@ -22,10 +22,10 @@ knitr::opts_chunk$set(
 ([Rcpp](https://cran.r-project.org/package=Rcpp) /
 [RcppArmadillo](https://cran.r-project.org/package=RcppArmadillo)):
 
-- **Quantile normalization** — map each sample row onto a target distribution
+- **Quantile normalization** - map each sample row onto a target distribution
   (no missing values; a focused port of
   `preprocessCore::normalize.quantiles.use.target()`).
-- **BMIQ-style gold-standard calibration** — for DNA methylation beta matrices
+- **BMIQ-style gold-standard calibration** - for DNA methylation beta matrices
   when a pipeline expects beta-mixture quantile calibration to a reference
   profile. The default path (`nL = 3`, `niter = 5`) is intentionally
   legacy-compatible, not a claim that five outer EM steps are statistical
@@ -62,11 +62,11 @@ dim(Y)
 
 For methylation betas, `bmiq_calibration()` fits a two- or three-component
 beta mixture per sample and maps components toward a gold-standard profile.
-Use this when you need that procedure (e.g. clock-style workflows); prefer
+Use this when you need that procedure (for example, clock-style workflows); prefer
 `quantile_norm()` when a plain target distribution is enough.
 
 Built-in example data: gold-standard annotation and a small beta matrix
-(6 samples × ~21k probes).
+(6 samples x ~21k probes).
 
 ```{r bmiq-data}
 data(horvath_goldstandard)
@@ -82,7 +82,7 @@ Three-state BMIQ with a hard outer EM cap of **five** iterations is the
 intentional default. That pair reproduces common legacy implementations
 (Horvath-style / MEAT-style clocks and similar pipelines). **Do not raise
 `niter` on the `nL = 3` path** unless you deliberately want results that
-diverge from those implementations—`bmiq_calibration()` warns if you do.
+diverge from those implementations; `bmiq_calibration()` warns if you do.
 
 If you want the mixture EM to run longer or toward convergence, switch to
 **`nL = 2`** (U/M only; no intermediate H step) and raise `niter` / tighten
@@ -141,15 +141,33 @@ fit <- bmiq_calibration(
 | `horvath_goldstandard` | Gold-standard probe annotation + mean betas |
 | `GPL21145_sample` | Example beta matrix for demos and tests |
 
+## Licensing
+
+betanorm is licensed under GPL (>= 3) because parts of it are derived from
+GPL-family code. Its quantile normalization is derived from preprocessCore (LGPL >= 2), and its BMIQ calibration and beta-mixture EM
+are derived from Steve Horvath's BMIQcalibration, which builds on Andrew
+Teschendorff's BMIQ and on the RPMM package (GPL >= 2). The original authors
+are credited as copyright holders in `DESCRIPTION`, and `inst/COPYRIGHTS`
+records which file derives from which source.
+
 ## References
 
-Bolstad BM, Irizarry RA, Åstrand M, Speed TP (2003). A comparison of
+Bolstad BM, Irizarry RA, Astrand M, Speed TP (2003). A comparison of
 normalization methods for high density oligonucleotide array data based on
-variance and bias. *Bioinformatics* 19(2), 185–193.
+variance and bias. *Bioinformatics* 19(2), 185-193.
 <https://doi.org/10.1093/bioinformatics/19.2.185>
+
+Bolstad BM. preprocessCore: A collection of pre-processing functions. R
+package, Bioconductor. <https://doi.org/10.18129/B9.bioc.preprocessCore>
 
 Teschendorff AE, Marabita F, Lechner M, Bartlett T, Tegner J, Gomez-Cabrero D,
 Beck S (2013). A beta-mixture quantile normalization method for correcting
 probe design bias in Illumina Infinium 450 k DNA methylation data.
-*Bioinformatics* 29(2), 189–196.
+*Bioinformatics* 29(2), 189-196.
 <https://doi.org/10.1093/bioinformatics/bts680>
+
+Horvath S (2013). DNA methylation age of human tissues and cell types.
+*Genome Biology* 14(10), R115. <https://doi.org/10.1186/gb-2013-14-10-r115>
+
+Houseman EA, Koestler DC. RPMM: Recursively Partitioned Mixture Model. R
+package, CRAN. <https://cran.r-project.org/package=RPMM>

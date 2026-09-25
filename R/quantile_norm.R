@@ -1,3 +1,7 @@
+# Derived from preprocessCore (normalize.quantiles.use.target, get_ranks),
+# copyright Ben Bolstad, LGPL (>= 2). Distributed here under GPL (>= 3).
+# See inst/COPYRIGHTS.
+
 #' Quantile Normalization to a Target Distribution
 #'
 #' Minimal, no-missing-data port of
@@ -15,10 +19,10 @@
 #'   preserved when present.
 #'
 #' @references
-#' Bolstad BM, Irizarry RA, Åstrand M, Speed TP (2003).
+#' Bolstad BM, Irizarry RA, Astrand M, Speed TP (2003).
 #' A comparison of normalization methods for high density oligonucleotide
 #' array data based on variance and bias.
-#' *Bioinformatics* 19(2), 185–193.
+#' *Bioinformatics* 19(2), 185-193.
 #' \doi{10.1093/bioinformatics/19.2.185}
 #'
 #' @export

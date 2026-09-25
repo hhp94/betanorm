@@ -1,10 +1,21 @@
 Type: Package
 Package: betanorm
 Title: Quantile and Beta-Mixture Microarray Normalization
-Version: 0.0.1
-Authors@R:
+Version: 0.1.0
+Authors@R: c(
     person("Hung", "Pham", , "amser.hoanghung@gmail.com", role = c("aut", "cre", "cph"),
-           comment = c(ORCID = "0000-0002-8271-9355"))
+           comment = c(ORCID = "0000-0002-8271-9355")),
+    person("Ben", "Bolstad", role = "cph",
+           comment = "quantile normalization, derived from preprocessCore (LGPL >= 2)"),
+    person("E. Andres", "Houseman", role = "cph",
+           comment = "beta-mixture EM, derived from RPMM (GPL >= 2)"),
+    person("Devin C.", "Koestler", role = "cph",
+           comment = "beta-mixture EM, derived from RPMM (GPL >= 2)"),
+    person("Andrew E.", "Teschendorff", role = "cph",
+           comment = "BMIQ calibration, derived from BMIQ v1.2"),
+    person("Steve", "Horvath", role = "cph",
+           comment = "BMIQ calibration and beta-mixture EM, derived from BMIQcalibration (CC BY 2.0)")
+  )
 Description: Provides quantile normalization that maps each sample onto a
     target distribution (requiring complete data), and beta-mixture
     quantile ('BMIQ') calibration of DNA methylation beta values to a
@@ -16,7 +27,7 @@ Description: Provides quantile normalization that maps each sample onto a
     beta-mixture quantile normalization follows Teschendorff, Marabita,
     Lechner, Bartlett, Tegner, Gomez-Cabrero and Beck (2013)
     <doi:10.1093/bioinformatics/bts680>.
-License: MIT + file LICENSE
+License: GPL (>= 3)
 URL: https://github.com/hhp94/betanorm
 BugReports: https://github.com/hhp94/betanorm/issues
 Depends:
@@ -30,10 +41,9 @@ Suggests:
     testthat (>= 3.0.0)
 LinkingTo:
     Rcpp
-Config/roxygen2/version: 8.0.0
+Config/roxygen2/version: 8.1.0
 Config/testthat/edition: 3
 Encoding: UTF-8
 Language: en-US
 LazyData: true
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 8.0.0

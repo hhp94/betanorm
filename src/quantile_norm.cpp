@@ -1,3 +1,7 @@
+// Derived from preprocessCore (normalize.quantiles.use.target, get_ranks),
+// copyright Ben Bolstad, LGPL (>= 2). Distributed here under GPL (>= 3).
+// See inst/COPYRIGHTS.
+
 #include <Rcpp.h>
 
 #include <algorithm>

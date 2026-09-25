@@ -25,9 +25,9 @@ ranked and mapped onto \code{target} (Bolstad equal-length indexing when
 \code{length(target) == ncol(obj)}; linear quantile interpolation otherwise).
 }
 \references{
-Bolstad BM, Irizarry RA, Åstrand M, Speed TP (2003).
+Bolstad BM, Irizarry RA, Astrand M, Speed TP (2003).
 A comparison of normalization methods for high density oligonucleotide
 array data based on variance and bias.
-\emph{Bioinformatics} 19(2), 185–193.
+\emph{Bioinformatics} 19(2), 185-193.
 \doi{10.1093/bioinformatics/19.2.185}
 }

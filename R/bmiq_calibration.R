@@ -1,3 +1,7 @@
+# Derived from Steve Horvath's BMIQcalibration (his adaptation of Andrew
+# Teschendorff's BMIQ v1.2), whose EM is modified from RPMM (Houseman and
+# Koestler, GPL >= 2). GPL (>= 3) here; see inst/COPYRIGHTS.
+
 # Legacy BMIQ caps the outer EM at five iterations. The niter default and the
 # legacy-drift warning must stay in sync, so both read this constant.
 LEGACY_BMIQ_NITER <- 5L
@@ -877,7 +881,7 @@ bmiq_gold_fit <- function(
 #' Gomez-Cabrero D, Beck S (2013).
 #' A beta-mixture quantile normalization method for correcting probe design
 #' bias in Illumina Infinium 450 k DNA methylation data.
-#' *Bioinformatics* 29(2), 189–196.
+#' *Bioinformatics* 29(2), 189-196.
 #' \doi{10.1093/bioinformatics/bts680}
 #'
 #' Horvath S (2013).

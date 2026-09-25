@@ -6,9 +6,11 @@ export(bmiq_calibration)
 export(bmiq_gold_fit)
 export(quantile_norm)
 importFrom(Rcpp,sourceCpp)
-importFrom(stats,dbeta)
-importFrom(stats,density)
-importFrom(stats,pbeta)
-importFrom(stats,qbeta)
+importFrom(stats,
+  dbeta,
+  density,
+  pbeta,
+  qbeta
+)
 importFrom(utils,modifyList)
 useDynLib(betanorm, .registration = TRUE)

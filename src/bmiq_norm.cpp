@@ -1,3 +1,7 @@
+// Beta-mixture EM derived from blc2/betaEst2 in Steve Horvath's BMIQcalibration,
+// modified from RPMM (blc, betaEst), copyright E. Andres Houseman and
+// Devin C. Koestler, GPL (>= 2). GPL (>= 3) here; see inst/COPYRIGHTS.
+
 #include <Rcpp.h>
 
 #include <algorithm>

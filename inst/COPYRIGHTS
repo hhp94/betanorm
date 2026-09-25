@@ -1,0 +1,35 @@
+betanorm is licensed under GPL (>= 3). Parts of it were written with other
+packages' source code open as the reference, and are derived from that code.
+The derived files and their origins are listed below.
+
+R/quantile_norm.R, src/quantile_norm.cpp
+  Derived from preprocessCore (normalize.quantiles.use.target, get_ranks),
+  copyright Ben Bolstad, LGPL (>= 2). Ported to a no-missing-data, row-wise
+  form in C++. LGPL (>= 2) permits distribution under GPL (>= 3).
+
+src/bmiq_norm.cpp, R/bmiq_calibration.R (mixture fitting)
+  Derived from blc2 and betaEst2 in Steve Horvath's BMIQcalibration code,
+  which are modified versions of blc and betaEst from RPMM, copyright
+  E. Andres Houseman and Devin C. Koestler, GPL (>= 2). Horvath's edits come
+  from the NORMALIZATION.R additional file published with Horvath S (2013),
+  DNA methylation age of human tissues and cell types, Genome Biology 14:R115,
+  doi:10.1186/gb-2013-14-10-r115, under CC BY 2.0. Rewritten in C++ with
+  a Newton M-step, Armijo line search and fit-status reporting.
+
+R/bmiq_calibration.R (thresholds, class modes and quantile transformation)
+  Derived from Steve Horvath's BMIQcalibration, his adaptation of Andrew
+  Teschendorff's BMIQ v1.2 (Teschendorff et al. 2013). Horvath's version is
+  the NORMALIZATION.R additional file published with Horvath S (2013),
+  Genome Biology 14:R115, doi:10.1186/gb-2013-14-10-r115, under CC BY 2.0.
+  Teschendorff's BMIQ
+  code is also distributed under GPL-3 in the Bioconductor packages ChAMP and
+  wateRmelon, which GPL (>= 3) covers.
+
+Reference copies
+  The source consulted during development is kept in the development
+  repository (the dev/ directory, not part of the built package):
+  dev/preprocessCore for the quantile normalization, and
+  dev/bmiq-calibration-legacy.R (Horvath's BMIQcalibration, blc2 and
+  betaEst2) for the BMIQ calibration and the beta-mixture EM.
+
+All other files: copyright Hung Pham, GPL (>= 3).

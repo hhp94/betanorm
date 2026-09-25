@@ -151,7 +151,7 @@ Teschendorff AE, Marabita F, Lechner M, Bartlett T, Tegner J,
 Gomez-Cabrero D, Beck S (2013).
 A beta-mixture quantile normalization method for correcting probe design
 bias in Illumina Infinium 450 k DNA methylation data.
-\emph{Bioinformatics} 29(2), 189–196.
+\emph{Bioinformatics} 29(2), 189-196.
 \doi{10.1093/bioinformatics/bts680}
 
 Horvath S (2013).
