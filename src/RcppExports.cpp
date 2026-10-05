@@ -36,11 +36,11 @@ BEGIN_RCPP
 END_RCPP
 }
 // scatter_sample_block_cpp
-void scatter_sample_block_cpp(Rcpp::NumericMatrix destination, const Rcpp::NumericMatrix& block, int first_sample);
+void scatter_sample_block_cpp(SEXP destination, const Rcpp::NumericMatrix& block, int first_sample);
 RcppExport SEXP _betanorm_scatter_sample_block_cpp(SEXP destinationSEXP, SEXP blockSEXP, SEXP first_sampleSEXP) {
 BEGIN_RCPP
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< Rcpp::NumericMatrix >::type destination(destinationSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type destination(destinationSEXP);
     Rcpp::traits::input_parameter< const Rcpp::NumericMatrix& >::type block(blockSEXP);
     Rcpp::traits::input_parameter< int >::type first_sample(first_sampleSEXP);
     scatter_sample_block_cpp(destination, block, first_sample);

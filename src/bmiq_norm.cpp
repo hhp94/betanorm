@@ -336,11 +336,23 @@ Rcpp::NumericMatrix gather_sample_block_cpp(
 {
     const int n_samples = x.nrow();
     const int n_probes = x.ncol();
-    const int first0 = first_sample - 1;
+
+    // NA_INTEGER is INT_MIN, so `first_sample - 1` would itself overflow
+    // before any bounds test could see it. Reject it first.
+    if (first_sample == NA_INTEGER || sample_count == NA_INTEGER)
+    {
+        Rcpp::stop("Invalid sample block");
+    }
+
+    // Widen before the arithmetic: in int, `first0 + sample_count` wraps
+    // negative on a large first_sample, passes the bounds test below, and the
+    // copy then reads ~2^31 elements past the matrix.
+    const R_xlen_t first0 = static_cast<R_xlen_t>(first_sample) - 1;
+    const R_xlen_t count = static_cast<R_xlen_t>(sample_count);
 
     if (first0 < 0 ||
-        sample_count < 1 ||
-        first0 + sample_count > n_samples)
+        count < 1 ||
+        first0 + count > static_cast<R_xlen_t>(n_samples))
     {
         Rcpp::stop("Invalid sample block");
     }
@@ -350,13 +362,13 @@ Rcpp::NumericMatrix gather_sample_block_cpp(
     const double *x_ptr = REAL(x);
     double *block_ptr = REAL(block);
 
-    for (int probe = 0; probe < n_probes; ++probe)
+    for (R_xlen_t probe = 0; probe < n_probes; ++probe)
     {
         const R_xlen_t x_offset =
             static_cast<R_xlen_t>(n_samples) * probe;
 
-        for (int local_sample = 0;
-             local_sample < sample_count;
+        for (R_xlen_t local_sample = 0;
+             local_sample < count;
              ++local_sample)
         {
             block_ptr[
@@ -372,21 +384,44 @@ Rcpp::NumericMatrix gather_sample_block_cpp(
 // Scatter a probes x sample_count block back into a samples x probes matrix.
 // This deliberately mutates `destination` in place, which is safe only when it
 // is a freshly allocated private matrix (never an alias of the caller's input);
-// bmiq_calibration() allocates `calibrated` for exactly this reason.
+// bmiq_calibration() allocates `calibrated` for exactly this reason. Nothing
+// here can enforce that: MAYBE_SHARED() would refuse the only legitimate
+// caller, because the generated R wrapper already binds `destination` as a
+// formal. It stays a caller invariant.
 // [[Rcpp::export]]
 void scatter_sample_block_cpp(
-    Rcpp::NumericMatrix destination,
+    SEXP destination,
     const Rcpp::NumericMatrix &block,
     int first_sample)
 {
-    const int n_samples = destination.nrow();
-    const int n_probes = destination.ncol();
+    // SEXP, not NumericMatrix: Rcpp would coerce a non-double matrix into a
+    // temporary, scatter into that, and drop it, leaving the caller's matrix
+    // silently untouched. A TYPEOF() check after coercion would only inspect
+    // the copy, so the parameter type itself has to refuse.
+    if (TYPEOF(destination) != REALSXP || !Rf_isMatrix(destination))
+    {
+        Rcpp::stop("destination must be a double matrix");
+    }
+
+    const Rcpp::NumericMatrix dest(destination);
+    const int n_samples = dest.nrow();
+    const int n_probes = dest.ncol();
     const int sample_count = block.ncol();
-    const int first0 = first_sample - 1;
+
+    if (first_sample == NA_INTEGER)
+    {
+        Rcpp::stop("Invalid destination or sample block");
+    }
+
+    // Widen before the arithmetic; see gather_sample_block_cpp(). Here the
+    // wrapped index would be a heap write, not a read.
+    const R_xlen_t first0 = static_cast<R_xlen_t>(first_sample) - 1;
+    const R_xlen_t count = static_cast<R_xlen_t>(sample_count);
 
     if (block.nrow() != n_probes ||
         first0 < 0 ||
-        first0 + sample_count > n_samples)
+        count < 0 ||
+        first0 + count > static_cast<R_xlen_t>(n_samples))
     {
         Rcpp::stop("Invalid destination or sample block");
     }
@@ -394,13 +429,13 @@ void scatter_sample_block_cpp(
     double *destination_ptr = REAL(destination);
     const double *block_ptr = REAL(block);
 
-    for (int probe = 0; probe < n_probes; ++probe)
+    for (R_xlen_t probe = 0; probe < n_probes; ++probe)
     {
         const R_xlen_t destination_offset =
             static_cast<R_xlen_t>(n_samples) * probe;
 
-        for (int local_sample = 0;
-             local_sample < sample_count;
+        for (R_xlen_t local_sample = 0;
+             local_sample < count;
              ++local_sample)
         {
             destination_ptr[

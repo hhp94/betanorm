@@ -151,6 +151,38 @@ profile or bench must set `options(pkg.build_extra_flags = FALSE)` and
 rebuild (`pkgbuild::clean_dll()`) first, or compare against
 `Rcpp::sourceCpp` output (which uses the standard -O2 Makeconf flags).
 
+## 2026-10-05 — Kernel hardening taken back from methylCIPHERv2 (partly)
+
+methylCIPHERv2 vendors these kernels and on 2026-08-10 ran a memory-safety
+audit over them (its `dev/DECISIONS.md`, "The kernels bounds-check their own
+arguments"). Taken back here, all bit-identical, none reachable from the
+exported functions:
+
+1. `gather_/scatter_sample_block_cpp`: block arithmetic in `R_xlen_t` with
+   `NA_INTEGER` rejected first. In `int`, a large or `NA` `first_sample`
+   wrapped negative, passed the existing bounds test, and segfaulted (the
+   scatter's was a heap write).
+2. `scatter_sample_block_cpp`: `destination` is `SEXP`, checked as a double
+   matrix before wrapping. As `NumericMatrix`, a non-double matrix was
+   coerced into a temporary, scattered into, and dropped silently.
+3. `qnorm_target_rows_cpp`: comparator is a total order with NaN last. The
+   bare `<` was UB in `std::sort` with NaN present.
+4. `target_unequal_rank`: the two early returns clamp the index like the
+   interpolating branch. Unreachable with ranks in [1, n]; kept for symmetry.
+
+These fix guards that already existed (1, 3, 4) or a parameter type (2), so
+they add no second validation owner.
+
+**Not taken: C++-side validation of the EM scalars** (`maxiter`,
+`beta_max_halving`, `min_shape`, `tol`, `armijo` NA/range checks). It adds
+a second owner for arguments R already validates or defaults, against
+"validation lives in R; C++ trusts its caller". Revisit only if those
+arguments become reachable from user input.
+
+The other methylCIPHERv2 divergences (no RNG/`nfit`, prefit-only gold, no
+debug/verbose, per-sample value scan, no warnings) are downstream choices
+for its own front door and stay there.
+
 ## Legacy compatibility (predates this log; do not drift)
 
 - `nL = 3`, `niter = 5` is the intentional legacy BMIQ configuration

@@ -1,7 +1,7 @@
 Type: Package
 Package: betanorm
 Title: Quantile and Beta-Mixture Microarray Normalization
-Version: 0.1.0
+Version: 0.1.1
 Authors@R: c(
     person("Hung", "Pham", , "amser.hoanghung@gmail.com", role = c("aut", "cre", "cph"),
            comment = c(ORCID = "0000-0002-8271-9355")),

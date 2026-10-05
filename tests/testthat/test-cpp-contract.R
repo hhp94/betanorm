@@ -270,3 +270,51 @@ test_that("gather/scatter reject out-of-range blocks", {
     regexp = "Invalid"
   )
 })
+
+test_that("gather/scatter reject block starts that would overflow int", {
+  # first_sample - 1 + sample_count used to wrap negative in int, pass the
+  # bounds test, and segfault (a heap write, for the scatter).
+  x <- matrix(seq_len(12L) / 100, nrow = 4L, ncol = 3L)
+  block <- matrix(1, nrow = 3L, ncol = 2L)
+
+  expect_error(
+    gather_sample_block_cpp(x, .Machine$integer.max, 2L),
+    regexp = "Invalid"
+  )
+  expect_error(gather_sample_block_cpp(x, NA_integer_, 1L), regexp = "Invalid")
+  expect_error(gather_sample_block_cpp(x, 1L, NA_integer_), regexp = "Invalid")
+  expect_error(
+    scatter_sample_block_cpp(x, block, .Machine$integer.max),
+    regexp = "Invalid"
+  )
+  expect_error(
+    scatter_sample_block_cpp(x, block, NA_integer_),
+    regexp = "Invalid"
+  )
+})
+
+test_that("scatter_sample_block_cpp refuses a destination it would coerce", {
+  # A coerced copy would be scattered into and dropped, leaving the caller's
+  # matrix silently untouched.
+  block <- matrix(1, nrow = 3L, ncol = 2L)
+  integer.destination <- matrix(0L, nrow = 4L, ncol = 3L)
+  expect_error(
+    scatter_sample_block_cpp(integer.destination, block, 1L),
+    regexp = "double matrix"
+  )
+  expect_identical(integer.destination, matrix(0L, nrow = 4L, ncol = 3L))
+  expect_error(
+    scatter_sample_block_cpp(as.numeric(1:12), block, 1L),
+    regexp = "double matrix"
+  )
+})
+
+test_that("qnorm_target_rows_cpp orders NaN last instead of invoking UB", {
+  # quantile_norm() rejects NaN; the kernel still has to sort it defined.
+  # NaN takes the top rank, so it maps to the largest target value and the
+  # finite values keep their ordinary ranks.
+  nan.in <- matrix(c(NaN, 0.9, 0.5, 0.3), nrow = 2L, ncol = 2L)
+  out <- qnorm_target_rows_cpp(nan.in, c(0.2, 0.8))
+  expect_identical(out[1L, ], c(0.8, 0.2))
+  expect_identical(out[2L, ], c(0.8, 0.2))
+})

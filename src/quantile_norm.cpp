@@ -17,8 +17,22 @@ namespace
         double value;
         int index;
 
+        // A total order with NaN last. A bare `value < other.value` makes NaN
+        // equivalent to everything, which is not a strict weak ordering and
+        // violates std::sort's precondition (UB: measured to silently drop the
+        // NaN and return plausible wrong numbers). quantile_norm() rejects NaN
+        // before this point; this keeps the kernel defined if that ever moves.
+        // For NaN-free input every comparison is unchanged, so the sort is too.
         bool operator<(const DataItem &other) const
         {
+            if (std::isnan(value))
+            {
+                return false;
+            }
+            if (std::isnan(other.value))
+            {
+                return true;
+            }
             return value < other.value;
         }
     };
@@ -36,6 +50,22 @@ namespace
             return 0.5 * (target[k - 1] + target[k]);
 
         return target[k - 1];
+    }
+
+    // 1-based target rank, clamped into [1, m]. The clamp is done in double:
+    // casting a negative double to size_t is UB, not a wrap.
+    inline std::size_t clamp_rank(double rank, std::size_t m)
+    {
+        double k = std::floor(rank);
+        if (!(k >= 1.0))
+        {
+            k = 1.0;
+        }
+        if (k > static_cast<double>(m))
+        {
+            k = static_cast<double>(m);
+        }
+        return static_cast<std::size_t>(k);
     }
 
     // unequal lengths: linear interpolation of the matching target quantile.
@@ -60,18 +90,17 @@ namespace
         {
             fraction = 0.0;
         }
+        // Both early returns clamp, matching the interpolating branch below.
+        // With rank in [1, n] the index already lies in [1, m], so the clamp
+        // never fires on valid input and the result is unchanged.
         if (fraction == 0.0)
         {
-            const std::size_t k = static_cast<std::size_t>(
-                std::floor(target_floor + 0.5));
-            return target[k - 1];
+            return target[clamp_rank(target_floor + 0.5, m) - 1];
         }
 
         if (fraction == 1.0)
         {
-            const std::size_t k = static_cast<std::size_t>(
-                std::floor(target_floor + 1.5));
-            return target[k - 1];
+            return target[clamp_rank(target_floor + 1.5, m) - 1];
         }
 
         const std::size_t k = static_cast<std::size_t>(
