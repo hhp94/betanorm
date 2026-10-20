@@ -8,10 +8,11 @@
 A data frame with 21368 rows and 7 variables:
 \describe{
 \item{\code{Name}}{Probe identifier.}
-\item{\code{Gene_ID}}{Associated gene identifier (may be missing).}
-\item{\code{GenomeBuild}}{Genome build.}
+\item{\code{Gene_ID}}{Associated gene identifier.}
+\item{\code{GenomeBuild}}{NCBI genome build (36 for every probe).}
 \item{\code{Chr}}{Chromosome.}
-\item{\code{MapInfo}}{Genomic coordinate.}
+\item{\code{MapInfo}}{Genomic coordinate on build 36, not on a current
+build.}
 \item{\code{SourceVersion}}{Annotation version.}
 \item{\code{goldstandard2}}{Gold-standard mean beta value.}
 }

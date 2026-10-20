@@ -6,10 +6,11 @@
 #' @format A data frame with 21368 rows and 7 variables:
 #' \describe{
 #'   \item{`Name`}{Probe identifier.}
-#'   \item{`Gene_ID`}{Associated gene identifier (may be missing).}
-#'   \item{`GenomeBuild`}{Genome build.}
+#'   \item{`Gene_ID`}{Associated gene identifier.}
+#'   \item{`GenomeBuild`}{NCBI genome build (36 for every probe).}
 #'   \item{`Chr`}{Chromosome.}
-#'   \item{`MapInfo`}{Genomic coordinate.}
+#'   \item{`MapInfo`}{Genomic coordinate on build 36, not on a current
+#'     build.}
 #'   \item{`SourceVersion`}{Annotation version.}
 #'   \item{`goldstandard2`}{Gold-standard mean beta value.}
 #' }
