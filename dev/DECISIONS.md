@@ -322,3 +322,20 @@ component, not per observation.
   default and the drift warning.
 - C++ returns keep the old RcppArmadillo shapes (K x 1 matrices, bare `eta`
   vector) — pinned by `test-cpp-contract.R`.
+- **The configuration is legacy, the numbers are not.** The rewrite
+  (`f536c1d`, 2026-07-11) departs from legacy BMIQ code
+  (`dev/bmiq-calibration-legacy.R`, MEAT) on purpose, in three steps.
+  Recorded 2026-10-20 (code review, chunk 3); the roxygen Details say the
+  same.
+  1. Class thresholds are weighted-density crossings
+     (`density_thresholds()`). Legacy code takes midpoints between
+     neighbouring classes' extreme values in the fit subset.
+  2. Components are fitted by Newton's method under the ascent guard.
+     Legacy code uses BFGS (`blc`) or Nelder-Mead (Horvath's `blc2`).
+  3. The H map is glued straight to the calibrated U maximum and upper-M
+     minimum. Legacy code offsets both anchors by the raw gaps (`deltaUH`,
+     `deltaHM`), so its output jumps at each join. Here the map has no
+     jump; the cost is that the outermost H probes tie with the probes
+     across each join (3000 distinct inputs, 2998 distinct outputs, in
+     the review check).
+  Changing any of them moves numbers: a feature change, not a cleanup.

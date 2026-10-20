@@ -121,7 +121,8 @@ summary.
 \description{
 BMIQ-style calibration of DNA methylation beta values to a gold-standard
 beta profile (beta-mixture quantile mapping). Provided for pipelines that
-require this procedure; defaults target legacy BMIQ compatibility.
+require this procedure. The defaults follow the legacy BMIQ configuration,
+though the numbers differ from legacy code (see Details).
 }
 \details{
 \strong{Choosing \code{nL} and \code{niter} are independent decisions.} \code{nL} is a
@@ -137,6 +138,16 @@ accepted when finite (the mixture is fit with a generalized-EM ascent guard
 so accepting an unconverged component cannot decrease the log-likelihood);
 per-component convergence status is reported in \code{diagnostics} when
 \code{debug = TRUE}.
+
+The defaults reproduce the legacy \emph{configuration}, not legacy output.
+Three steps differ from the legacy BMIQ code on purpose. Class thresholds
+are the crossings of the weighted component densities, where legacy code
+takes midpoints between neighbouring classes' extreme values in the fit
+subset. Each component is fitted by Newton's method under the ascent
+guard, where legacy code uses BFGS or Nelder-Mead. And the H map is joined
+directly to the calibrated U maximum and upper-M minimum, so the output has
+no jump at either join, where legacy code carries the raw gaps between the
+classes into the output.
 
 With \code{nL = 3}, samples are fit as unmethylated (U), intermediate (H), and
 methylated (M) components, then quantile-normalized to the gold standard
