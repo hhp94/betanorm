@@ -74,8 +74,8 @@ convergence is otherwise a valid choice.}
 \code{doH = TRUE}. Exactly one of:
 \itemize{
 \item \code{"optional"} (default): keep the U-plus-upper-M calibration for that
-sample (lower-M observations, normally absorbed into the H map, are
-left unchanged).
+sample. The H class and the lower-M observations, which the H map
+would have calibrated, are left unchanged.
 \item \code{"require"}: treat the sample as failed.
 }}
 
@@ -138,8 +138,9 @@ per-component convergence status is reported in \code{diagnostics} when
 With \code{nL = 3}, samples are fit as unmethylated (U), intermediate (H), and
 methylated (M) components, then quantile-normalized to the gold standard
 (with continuous H stitching when H runs). When H is skipped
-(\code{h.policy = "optional"}), U and the upper-M tail are calibrated and
-lower-M observations are left unchanged, matching legacy BMIQ.
+(\code{h.policy = "optional"}), U and the upper-M tail are calibrated, and the
+H class and the lower-M observations are left unchanged, as in legacy BMIQ
+with H turned off.
 
 With \code{nL = 2}, only U and M are used (no H step). Normalization uses
 truncated component quantile maps joined at the gold U/M threshold so both

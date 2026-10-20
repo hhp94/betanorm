@@ -881,8 +881,8 @@ bmiq_gold_fit <- function(
 #' @param h.policy What to do if intermediate (H) normalization fails when
 #'   `doH = TRUE`. Exactly one of:
 #'   * `"optional"` (default): keep the U-plus-upper-M calibration for that
-#'     sample (lower-M observations, normally absorbed into the H map, are
-#'     left unchanged).
+#'     sample. The H class and the lower-M observations, which the H map
+#'     would have calibrated, are left unchanged.
 #'   * `"require"`: treat the sample as failed.
 #' @param on.sample.error What to do when a sample fails. Exactly one of:
 #'   * `"stop"` (default): abort.
@@ -926,8 +926,9 @@ bmiq_gold_fit <- function(
 #' With `nL = 3`, samples are fit as unmethylated (U), intermediate (H), and
 #' methylated (M) components, then quantile-normalized to the gold standard
 #' (with continuous H stitching when H runs). When H is skipped
-#' (`h.policy = "optional"`), U and the upper-M tail are calibrated and
-#' lower-M observations are left unchanged, matching legacy BMIQ.
+#' (`h.policy = "optional"`), U and the upper-M tail are calibrated, and the
+#' H class and the lower-M observations are left unchanged, as in legacy BMIQ
+#' with H turned off.
 #'
 #' With `nL = 2`, only U and M are used (no H step). Normalization uses
 #' truncated component quantile maps joined at the gold U/M threshold so both
@@ -1343,7 +1344,7 @@ bmiq_calibration <- function(
                 ii,
                 " (",
                 conditionMessage(h.attempt),
-                "); U plus upper-M calibration (lower-M left unchanged)."
+                "); U plus upper-M calibration (H and lower-M left unchanged)."
               )
             }
             if (debug) {
