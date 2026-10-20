@@ -163,7 +163,7 @@ namespace
 
 } // namespace
 
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::NumericMatrix qnorm_target_rows_cpp(
     const Rcpp::NumericMatrix &obj,
     const Rcpp::NumericVector &target)

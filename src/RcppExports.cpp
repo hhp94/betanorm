@@ -14,7 +14,6 @@ Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 void scan_finite_unit_interval_cpp(const Rcpp::NumericVector& x, std::string name, bool require_open);
 RcppExport SEXP _betanorm_scan_finite_unit_interval_cpp(SEXP xSEXP, SEXP nameSEXP, SEXP require_openSEXP) {
 BEGIN_RCPP
-    Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type x(xSEXP);
     Rcpp::traits::input_parameter< std::string >::type name(nameSEXP);
     Rcpp::traits::input_parameter< bool >::type require_open(require_openSEXP);
@@ -27,7 +26,6 @@ Rcpp::NumericMatrix gather_sample_block_cpp(const Rcpp::NumericMatrix& x, int fi
 RcppExport SEXP _betanorm_gather_sample_block_cpp(SEXP xSEXP, SEXP first_sampleSEXP, SEXP sample_countSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const Rcpp::NumericMatrix& >::type x(xSEXP);
     Rcpp::traits::input_parameter< int >::type first_sample(first_sampleSEXP);
     Rcpp::traits::input_parameter< int >::type sample_count(sample_countSEXP);
@@ -39,7 +37,6 @@ END_RCPP
 void scatter_sample_block_cpp(SEXP destination, const Rcpp::NumericMatrix& block, int first_sample);
 RcppExport SEXP _betanorm_scatter_sample_block_cpp(SEXP destinationSEXP, SEXP blockSEXP, SEXP first_sampleSEXP) {
 BEGIN_RCPP
-    Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< SEXP >::type destination(destinationSEXP);
     Rcpp::traits::input_parameter< const Rcpp::NumericMatrix& >::type block(blockSEXP);
     Rcpp::traits::input_parameter< int >::type first_sample(first_sampleSEXP);
@@ -52,7 +49,6 @@ Rcpp::List beta_mixture_em_cpp(const Rcpp::NumericVector& y, const Rcpp::Numeric
 RcppExport SEXP _betanorm_beta_mixture_em_cpp(SEXP ySEXP, SEXP initial_responsibilitySEXP, SEXP nLSEXP, SEXP maxiterSEXP, SEXP tolSEXP, SEXP beta_maxitSEXP, SEXP beta_max_halvingSEXP, SEXP beta_score_tolSEXP, SEXP min_shapeSEXP, SEXP armijoSEXP, SEXP debugSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type y(ySEXP);
     Rcpp::traits::input_parameter< const Rcpp::NumericMatrix& >::type initial_responsibility(initial_responsibilitySEXP);
     Rcpp::traits::input_parameter< int >::type nL(nLSEXP);
@@ -73,7 +69,6 @@ Rcpp::NumericMatrix qnorm_target_rows_cpp(const Rcpp::NumericMatrix& obj, const 
 RcppExport SEXP _betanorm_qnorm_target_rows_cpp(SEXP objSEXP, SEXP targetSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const Rcpp::NumericMatrix& >::type obj(objSEXP);
     Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type target(targetSEXP);
     rcpp_result_gen = Rcpp::wrap(qnorm_target_rows_cpp(obj, target));

@@ -284,7 +284,7 @@ namespace
 } // anonymous namespace
 
 // NumericVector deliberately accepts both vectors and numeric matrices.
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 void scan_finite_unit_interval_cpp(
     const Rcpp::NumericVector &x,
     std::string name = "x",
@@ -328,7 +328,7 @@ void scan_finite_unit_interval_cpp(
 // (row) is strided; the returned block stores each sample contiguously, which
 // makes the per-sample work and the scatter back cache-friendly without paying
 // for a full transpose.
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::NumericMatrix gather_sample_block_cpp(
     const Rcpp::NumericMatrix &x,
     int first_sample,
@@ -388,7 +388,7 @@ Rcpp::NumericMatrix gather_sample_block_cpp(
 // here can enforce that: MAYBE_SHARED() would refuse the only legitimate
 // caller, because the generated R wrapper already binds `destination` as a
 // formal. It stays a caller invariant.
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 void scatter_sample_block_cpp(
     SEXP destination,
     const Rcpp::NumericMatrix &block,
@@ -447,7 +447,7 @@ void scatter_sample_block_cpp(
     }
 }
 
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::List beta_mixture_em_cpp(
     const Rcpp::NumericVector &y,
     const Rcpp::NumericMatrix &initial_responsibility,
