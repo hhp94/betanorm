@@ -24,14 +24,17 @@ those there without new evidence. Work in flight is tracked in
   `a`, `b`, `eta`, `mu`, responsibilities, or thresholds independently;
   canonicalization happens once in `canonicalize_em_components()` (R side),
   and the K x 1 shapes are flattened to vectors once in `fit_mixture()`.
-- **Validation lives in R; C++ trusts its caller** — with one deliberate
-  exception: `beta_mixture_em_cpp` owns its strict-interior (0, 1)
-  precondition on `y`.
+- **Validation lives in R; C++ trusts its caller.** Each invariant has one
+  owner (DECISIONS.md). The C++ that does check input is deliberate:
+  `scan_finite_unit_interval_cpp` is R's single-pass finite/[0, 1] scan,
+  `beta_mixture_em_cpp` owns its strict-interior (0, 1) precondition on `y`,
+  and the kernels' bounds guards are memory safety, not validation.
 - **The gold standard is consumed purely distributionally** (shapes,
   thresholds, class modes). Nothing may index it per-probe or assume
   alignment with `ncol(datM)`.
-- Execution is **serial by design**; see DECISIONS.md before adding any
-  threading or parallel machinery.
+- Execution starts **serial**. Parallelism is added only after extensive
+  testing and experimentation justify it; DECISIONS.md records what has
+  been measured and why earlier attempts were rejected.
 
 ## Workflow
 
