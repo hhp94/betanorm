@@ -34,7 +34,7 @@
 #' [horvath_goldstandard], for use with [bmiq_calibration()].
 #'
 #' @format A numeric matrix with 6 samples (rows) and 21368 CpGs (columns).
-#'   Column names match `horvath_goldstandard$Name`. Values are in
+#'   Column names match `horvath_goldstandard[["Name"]]`. Values are in
 #'   \eqn{[0, 1]}.
 #'
 #' @examples

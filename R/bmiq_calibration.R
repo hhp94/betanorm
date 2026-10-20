@@ -171,8 +171,8 @@ density_thresholds <- function(
           stats::uniroot(
             log_score_diff,
             interval = c(left, right),
-            tol = sqrt(.Machine$double.eps)
-          )$root
+            tol = sqrt(.Machine[["double.eps"]])
+          )[["root"]]
         )
       }
     }
@@ -341,7 +341,7 @@ estimate_mode <- function(x, context) {
   # density() is not boundary-corrected, so its Gaussian tails can place the
   # mode just outside the unit interval; clamp so it can only shift the
   # initialization thresholds toward, never past, a valid beta value.
-  mode <- estimate$x[which.max(estimate$y)]
+  mode <- estimate[["x"]][which.max(estimate[["y"]])]
   min(1, max(0, mode))
 }
 
@@ -351,10 +351,10 @@ estimate_mode <- function(x, context) {
 # component nL as M, and density_thresholds() can assume adjacent components
 # are ordered. Never sort a, b, eta, or thresholds independently.
 canonicalize_em_components <- function(em, context) {
-  a <- as.numeric(em$a[, 1L])
-  b <- as.numeric(em$b[, 1L])
-  eta <- as.numeric(em$eta)
-  mu <- as.numeric(em$mu[, 1L])
+  a <- as.numeric(em[["a"]][, 1L])
+  b <- as.numeric(em[["b"]][, 1L])
+  eta <- as.numeric(em[["eta"]])
+  mu <- as.numeric(em[["mu"]][, 1L])
 
   if (
     any(!is.finite(c(a, b, eta, mu))) ||
@@ -368,15 +368,15 @@ canonicalize_em_components <- function(em, context) {
 
   ord <- order(mu)
 
-  em$a <- em$a[ord, , drop = FALSE]
-  em$b <- em$b[ord, , drop = FALSE]
-  em$mu <- em$mu[ord, , drop = FALSE]
-  em$eta <- em$eta[ord]
-  em$w <- em$w[, ord, drop = FALSE]
-  em$fit_status <- em$fit_status[ord]
-  em$fit_reason <- em$fit_reason[ord]
+  em[["a"]] <- em[["a"]][ord, , drop = FALSE]
+  em[["b"]] <- em[["b"]][ord, , drop = FALSE]
+  em[["mu"]] <- em[["mu"]][ord, , drop = FALSE]
+  em[["eta"]] <- em[["eta"]][ord]
+  em[["w"]] <- em[["w"]][, ord, drop = FALSE]
+  em[["fit_status"]] <- em[["fit_status"]][ord]
+  em[["fit_reason"]] <- em[["fit_reason"]][ord]
 
-  mu <- as.numeric(em$mu[, 1L])
+  mu <- as.numeric(em[["mu"]][, 1L])
   if (any(diff(mu) <= 0)) {
     stop(
       context,
@@ -460,7 +460,7 @@ fit_mixture <- function(
   # clips at endpoint.eps so a subnormal input cannot round the bound back to
   # an exact 0 or 1 (which would feed log(0) into the mixture fit).
   y_fit <- beta.fit
-  endpoint.eps <- sqrt(.Machine$double.eps)
+  endpoint.eps <- sqrt(.Machine[["double.eps"]])
   positive <- y_fit[y_fit > 0]
   below.one <- y_fit[y_fit < 1]
   lower.clip <- if (length(positive)) {
@@ -500,27 +500,27 @@ fit_mixture <- function(
 
   # Flatten the legacy K x 1 matrix shapes once at this boundary so all
   # downstream R code sees plain numeric vectors.
-  em$a <- as.numeric(em$a[, 1L])
-  em$b <- as.numeric(em$b[, 1L])
-  em$mu <- as.numeric(em$mu[, 1L])
+  em[["a"]] <- as.numeric(em[["a"]][, 1L])
+  em[["b"]] <- as.numeric(em[["b"]][, 1L])
+  em[["mu"]] <- as.numeric(em[["mu"]][, 1L])
 
   # Components are already canonicalized by increasing mean.
-  component.means <- em$mu
+  component.means <- em[["mu"]]
 
   # Diagnostic only: a valid soft component may never win the hard posterior
   # assignment, so do not reject on it. The load-bearing class checks are the
   # initial-count check above and the complete threshold-class check below.
-  subset.class <- max.col(em$w, ties.method = "first")
+  subset.class <- max.col(em[["w"]], ties.method = "first")
   subset.counts <- tabulate(subset.class, nbins = nL)
 
   # The responsibility matrix is not returned in diagnostics and is only used
   # for the counts above; drop it so it is not carried for the whole run.
-  em$w <- NULL
+  em[["w"]] <- NULL
 
   posterior.thresholds <- density_thresholds(
-    a = em$a,
-    b = em$b,
-    eta = as.numeric(em$eta),
+    a = em[["a"]],
+    b = em[["b"]],
+    eta = as.numeric(em[["eta"]]),
     component.means = component.means,
     context = paste0(context, " posterior mixture")
   )
@@ -550,30 +550,30 @@ fit_mixture <- function(
 }
 
 em_diagnostics <- function(fit, extra = NULL) {
-  em <- fit$em
+  em <- fit[["em"]]
   out <- list(
-    random_indices = fit$random_indices,
-    initial_class_counts = fit$initial_class_counts,
-    eta = em$eta,
-    component_means = fit$component_means,
-    component_a = em$a,
-    component_b = em$b,
-    component_fit_status = em$fit_status,
-    component_fit_reason = em$fit_reason,
-    em_iterations = em$iterations,
-    em_converged = em$converged,
-    parameter_criterion = em$parameter_criterion,
-    loglik_criterion = em$loglik_criterion,
-    log_likelihood = em$llike,
-    subset_map_counts = fit$subset_map_counts,
-    thresholds = fit$thresholds,
-    complete_class_counts = fit$complete_class_counts
+    random_indices = fit[["random_indices"]],
+    initial_class_counts = fit[["initial_class_counts"]],
+    eta = em[["eta"]],
+    component_means = fit[["component_means"]],
+    component_a = em[["a"]],
+    component_b = em[["b"]],
+    component_fit_status = em[["fit_status"]],
+    component_fit_reason = em[["fit_reason"]],
+    em_iterations = em[["iterations"]],
+    em_converged = em[["converged"]],
+    parameter_criterion = em[["parameter_criterion"]],
+    loglik_criterion = em[["loglik_criterion"]],
+    log_likelihood = em[["llike"]],
+    subset_map_counts = fit[["subset_map_counts"]],
+    thresholds = fit[["thresholds"]],
+    complete_class_counts = fit[["complete_class_counts"]]
   )
-  if (!is.null(em$parameter_criterion_trace)) {
-    out$parameter_criterion_trace <- em$parameter_criterion_trace
+  if (!is.null(em[["parameter_criterion_trace"]])) {
+    out[["parameter_criterion_trace"]] <- em[["parameter_criterion_trace"]]
   }
-  if (!is.null(em$loglik_criterion_trace)) {
-    out$loglik_criterion_trace <- em$loglik_criterion_trace
+  if (!is.null(em[["loglik_criterion_trace"]])) {
+    out[["loglik_criterion_trace"]] <- em[["loglik_criterion_trace"]]
   }
   if (!is.null(extra)) {
     out <- c(out, extra)
@@ -678,11 +678,11 @@ fit_gold_standard <- function(
   )
 
   unmethylated.mode <- estimate_mode(
-    goldstandard.beta[gold.fit$full_class == 1L],
+    goldstandard.beta[gold.fit[["full_class"]] == 1L],
     "Gold-standard unmethylated class"
   )
   methylated.mode <- estimate_mode(
-    goldstandard.beta[gold.fit$full_class == nL],
+    goldstandard.beta[gold.fit[["full_class"]] == nL],
     "Gold-standard methylated class"
   )
 
@@ -692,9 +692,9 @@ fit_gold_standard <- function(
 
   structure(
     list(
-      a = gold.fit$em$a,
-      b = gold.fit$em$b,
-      thresholds = as.numeric(gold.fit$thresholds),
+      a = gold.fit[["em"]][["a"]],
+      b = gold.fit[["em"]][["b"]],
+      thresholds = as.numeric(gold.fit[["thresholds"]]),
       unmethylated.mode = unmethylated.mode,
       methylated.mode = methylated.mode,
       nL = nL,
@@ -769,12 +769,12 @@ bmiq_gold_fit <- function(
 
   fit_gold_standard(
     goldstandard.beta,
-    nL = settings$nL,
-    nfit = settings$nfit,
+    nL = settings[["nL"]],
+    nfit = settings[["nfit"]],
     th1.v = th1.v,
-    niter = settings$niter,
+    niter = settings[["niter"]],
     tol = tol,
-    beta.maxit = settings$beta.maxit,
+    beta.maxit = settings[["beta.maxit"]],
     beta.score.tol = beta.score.tol,
     debug = debug,
     verbose = verbose
@@ -933,10 +933,10 @@ bmiq_calibration <- function(
     beta.maxit,
     beta.score.tol
   )
-  nL <- settings$nL
-  nfit <- settings$nfit
-  niter <- settings$niter
-  beta.maxit <- settings$beta.maxit
+  nL <- settings[["nL"]]
+  nfit <- settings[["nfit"]]
+  niter <- settings[["niter"]]
+  beta.maxit <- settings[["beta.maxit"]]
 
   if (is.null(doH)) {
     doH <- nL == 3L
@@ -995,10 +995,10 @@ bmiq_calibration <- function(
   # bmiq_gold_fit object can stand in for the raw vector and be reused across
   # calls (e.g. chunked calibration of one large matrix).
   if (inherits(goldstandard.beta, "bmiq_gold_fit")) {
-    if (goldstandard.beta$nL != nL) {
+    if (goldstandard.beta[["nL"]] != nL) {
       stop(
         "goldstandard.beta was fitted with nL = ",
-        goldstandard.beta$nL,
+        goldstandard.beta[["nL"]],
         " but this call requested nL = ",
         nL,
         ".",
@@ -1021,12 +1021,12 @@ bmiq_calibration <- function(
     )
   }
 
-  gold.a <- gold$a
-  gold.b <- gold$b
-  gold.thresholds <- gold$thresholds
-  mod1U <- gold$unmethylated.mode
-  mod1M <- gold$methylated.mode
-  gold.diagnostics <- if (debug) gold$diagnostics else NULL
+  gold.a <- gold[["a"]]
+  gold.b <- gold[["b"]]
+  gold.thresholds <- gold[["thresholds"]]
+  mod1U <- gold[["unmethylated.mode"]]
+  mod1M <- gold[["methylated.mode"]]
+  gold.diagnostics <- if (debug) gold[["diagnostics"]] else NULL
 
   # The fit subset is identical for every sample (same probe count, nfit, and
   # seed), so draw it once for the whole loop.
@@ -1069,12 +1069,12 @@ bmiq_calibration <- function(
         )
 
         if (debug) {
-          diagnostic$low_mode_window_count <-
+          diagnostic[["low_mode_window_count"]] <-
             length(low.mode.values)
-          diagnostic$high_mode_window_count <-
+          diagnostic[["high_mode_window_count"]] <-
             length(high.mode.values)
-          diagnostic$unmethylated_mode <- mod2U
-          diagnostic$methylated_mode <- mod2M
+          diagnostic[["unmethylated_mode"]] <- mod2U
+          diagnostic[["methylated_mode"]] <- mod2M
         }
 
         stage <- "initial threshold construction"
@@ -1107,9 +1107,9 @@ bmiq_calibration <- function(
         )
 
         if (debug) {
-          diagnostic$unmethylated_shift <- unmethylated.shift
-          diagnostic$methylated_shift <- methylated.shift
-          diagnostic$initial_thresholds <- th2.initial
+          diagnostic[["unmethylated_shift"]] <- unmethylated.shift
+          diagnostic[["methylated_shift"]] <- methylated.shift
+          diagnostic[["initial_thresholds"]] <- th2.initial
         }
 
         stage <- "sample mixture fitting"
@@ -1128,16 +1128,16 @@ bmiq_calibration <- function(
           fit.idx = sample.fit.idx
         )
 
-        em2.o <- sample.fit$em
-        classAV2.v <- sample.fit$component_means
-        class2.v <- sample.fit$full_class
+        em2.o <- sample.fit[["em"]]
+        classAV2.v <- sample.fit[["component_means"]]
+        class2.v <- sample.fit[["full_class"]]
 
         if (debug) {
           diagnostic <- modifyList(
             diagnostic,
             em_diagnostics(sample.fit)
           )
-          diagnostic$posterior_thresholds <- sample.fit$thresholds
+          diagnostic[["posterior_thresholds"]] <- sample.fit[["thresholds"]]
         }
 
         nbeta2.v <- beta2.v
@@ -1164,17 +1164,18 @@ bmiq_calibration <- function(
           nbeta2.v <- normalize_nl2(
             beta = beta2.v,
             class = class2.v,
-            sample.a = em2.o$a,
-            sample.b = em2.o$b,
+            sample.a = em2.o[["a"]],
+            sample.b = em2.o[["b"]],
             gold.a = gold.a,
             gold.b = gold.b,
-            sample.threshold = sample.fit$thresholds[1L],
+            sample.threshold = sample.fit[["thresholds"]][1L],
             gold.threshold = gold.thresholds[1L],
             context = paste0("Sample ", ii, " nL=2 map")
           )
           if (debug) {
-            diagnostic$nl2_sample_threshold <- sample.fit$thresholds[1L]
-            diagnostic$nl2_gold_threshold <- gold.thresholds[1L]
+            diagnostic[["nl2_sample_threshold"]] <-
+              sample.fit[["thresholds"]][1L]
+            diagnostic[["nl2_gold_threshold"]] <- gold.thresholds[1L]
           }
         } else {
           stage <- "unmethylated quantile normalization"
@@ -1182,8 +1183,8 @@ bmiq_calibration <- function(
           if (length(selUL.idx)) {
             nbeta2.v[selUL.idx] <- map_beta_q(
               beta2.v[selUL.idx],
-              em2.o$a[U],
-              em2.o$b[U],
+              em2.o[["a"]][U],
+              em2.o[["b"]][U],
               gold.a[U],
               gold.b[U],
               lower.tail = TRUE
@@ -1193,8 +1194,8 @@ bmiq_calibration <- function(
           if (length(selUR.idx)) {
             nbeta2.v[selUR.idx] <- map_beta_q(
               beta2.v[selUR.idx],
-              em2.o$a[U],
-              em2.o$b[U],
+              em2.o[["a"]][U],
+              em2.o[["b"]][U],
               gold.a[U],
               gold.b[U],
               lower.tail = FALSE
@@ -1206,8 +1207,8 @@ bmiq_calibration <- function(
           if (length(selMR.idx)) {
             nbeta2.v[selMR.idx] <- map_beta_q(
               beta2.v[selMR.idx],
-              em2.o$a[M],
-              em2.o$b[M],
+              em2.o[["a"]][M],
+              em2.o[["b"]][M],
               gold.a[M],
               gold.b[M],
               lower.tail = FALSE
@@ -1216,7 +1217,7 @@ bmiq_calibration <- function(
         }
 
         if (debug) {
-          diagnostic$tail_counts <- c(
+          diagnostic[["tail_counts"]] <- c(
             U_left = length(selUL.idx),
             U_right = length(selUR.idx),
             M_left = length(selML.idx),
@@ -1272,10 +1273,10 @@ bmiq_calibration <- function(
                 nminH + hf * (beta2.v[selH.idx] - minH)
 
               if (debug) {
-                diagnostic$H_count <- length(selH.idx)
-                diagnostic$H_input_range <- c(minH, maxH)
-                diagnostic$H_output_anchors <- c(nminH, nmaxH)
-                diagnostic$H_scale <- hf
+                diagnostic[["H_count"]] <- length(selH.idx)
+                diagnostic[["H_input_range"]] <- c(minH, maxH)
+                diagnostic[["H_output_anchors"]] <- c(nminH, nmaxH)
+                diagnostic[["H_scale"]] <- hf
               }
 
               TRUE
@@ -1296,7 +1297,7 @@ bmiq_calibration <- function(
               )
             }
             if (debug) {
-              diagnostic$h_skip_reason <- conditionMessage(h.attempt)
+              diagnostic[["h_skip_reason"]] <- conditionMessage(h.attempt)
             }
           } else {
             stop(h.attempt)
@@ -1319,9 +1320,9 @@ bmiq_calibration <- function(
         nbeta2.v <- pmin(1, pmax(0, nbeta2.v))
 
         if (debug) {
-          diagnostic$output_range <- range(nbeta2.v)
-          diagnostic$h_applied <- if (doH) h.applied else NA
-          diagnostic$success <- TRUE
+          diagnostic[["output_range"]] <- range(nbeta2.v)
+          diagnostic[["h_applied"]] <- if (doH) h.applied else NA
+          diagnostic[["success"]] <- TRUE
         }
 
         list(
@@ -1332,9 +1333,9 @@ bmiq_calibration <- function(
       },
       error = function(error) {
         if (debug) {
-          diagnostic$success <- FALSE
-          diagnostic$failure_stage <- stage
-          diagnostic$failure_message <-
+          diagnostic[["success"]] <- FALSE
+          diagnostic[["failure_stage"]] <- stage
+          diagnostic[["failure_message"]] <-
             conditionMessage(error)
         }
 
@@ -1423,28 +1424,28 @@ bmiq_calibration <- function(
         # failed.sample == "original": leave the gathered originals in place.
 
         failures[[length(failures) + 1L]] <- data.frame(
-          sample_index = attempt$sample.index,
-          sample_name = attempt$sample.name,
-          stage = attempt$stage,
-          message = attempt$original.message,
+          sample_index = attempt[["sample.index"]],
+          sample_name = attempt[["sample.name"]],
+          stage = attempt[["stage"]],
+          message = attempt[["original.message"]],
           stringsAsFactors = FALSE
         )
 
         if (debug) {
-          sample.diagnostics[[ii]] <- attempt$diagnostics
+          sample.diagnostics[[ii]] <- attempt[["diagnostics"]]
         }
 
         next
       }
 
-      block[, local.sample] <- attempt$beta
+      block[, local.sample] <- attempt[["beta"]]
       success[ii] <- TRUE
       if (doH) {
-        h.applied.vec[ii] <- attempt$h_applied
+        h.applied.vec[ii] <- attempt[["h_applied"]]
       }
 
       if (debug) {
-        sample.diagnostics[[ii]] <- attempt$diagnostics
+        sample.diagnostics[[ii]] <- attempt[["diagnostics"]]
       }
     }
 
@@ -1469,7 +1470,7 @@ bmiq_calibration <- function(
       } else {
         "left uncalibrated"
       },
-      ". See result$failures.",
+      '. See result[["failures"]].',
       call. = FALSE
     )
   } else {
@@ -1487,7 +1488,7 @@ bmiq_calibration <- function(
     warning(
       length(skipped.h),
       " sample(s) calibrated without H (U plus upper-M). ",
-      "See result$h.applied.",
+      'See result[["h.applied"]].',
       call. = FALSE
     )
   }
@@ -1532,22 +1533,24 @@ bmiq_calibration <- function(
 #' @param ... Unused.
 #' @export
 print.bmiq_calibration_result <- function(x, ...) {
-  number.of.samples <- length(x$success)
-  number.succeeded <- sum(x$success)
+  number.of.samples <- length(x[["success"]])
+  number.succeeded <- sum(x[["success"]])
   number.failed <- number.of.samples - number.succeeded
-  number.h.skipped <- sum(x$success & !is.na(x$h.applied) & !x$h.applied)
+  number.h.skipped <- sum(
+    x[["success"]] & !is.na(x[["h.applied"]]) & !x[["h.applied"]]
+  )
 
   cat("BMIQ calibration result\n")
   cat("  Samples:   ", number.of.samples, "\n", sep = "")
   cat("  Succeeded: ", number.succeeded, "\n", sep = "")
   cat("  Failed:    ", number.failed, "\n", sep = "")
-  if (isTRUE(x$settings$doH)) {
+  if (isTRUE(x[["settings"]][["doH"]])) {
     cat("  H skipped: ", number.h.skipped, " (U plus upper-M)\n", sep = "")
   }
 
   if (number.failed) {
     cat("\nFailures:\n")
-    print(x$failures, row.names = FALSE)
+    print(x[["failures"]], row.names = FALSE)
   }
 
   invisible(x)
@@ -1556,5 +1559,5 @@ print.bmiq_calibration_result <- function(x, ...) {
 #' @rdname bmiq_calibration
 #' @export
 as.matrix.bmiq_calibration_result <- function(x, ...) {
-  x$calibrated
+  x[["calibrated"]]
 }

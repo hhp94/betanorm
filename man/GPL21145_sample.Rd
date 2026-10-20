@@ -6,7 +6,7 @@
 \title{Example Methylation Beta Matrix (GPL21145)}
 \format{
 A numeric matrix with 6 samples (rows) and 21368 CpGs (columns).
-Column names match \code{horvath_goldstandard$Name}. Values are in
+Column names match \code{horvath_goldstandard[["Name"]]}. Values are in
 \eqn{[0, 1]}.
 }
 \usage{
