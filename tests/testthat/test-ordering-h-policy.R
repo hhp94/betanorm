@@ -57,50 +57,6 @@ test_that("canonicalize_em_components rejects indistinguishable means", {
   )
 })
 
-# Force H normalization to fail through a guard that survives canonicalization:
-# push the methylated-component mean above every observation so there are no
-# methylated probes above it (empty upper-M tail). Returns a mock function for
-# fit_mixture; the caller must install it with local_mocked_bindings() in its
-# own frame so the binding stays live for the test body.
-mock_h_failure <- function(real) {
-  # Force `real` now: if it stayed a lazy promise it would resolve to the
-  # mocked binding (itself) once installed, causing infinite recursion.
-  force(real)
-  function(
-    beta,
-    thresholds,
-    nL,
-    nfit,
-    niter,
-    tol,
-    beta.maxit,
-    beta.score.tol,
-    context,
-    debug = FALSE,
-    seed = 1L,
-    fit.idx = NULL
-  ) {
-    fit <- real(
-      beta = beta,
-      thresholds = thresholds,
-      nL = nL,
-      nfit = nfit,
-      niter = niter,
-      tol = tol,
-      beta.maxit = beta.maxit,
-      beta.score.tol = beta.score.tol,
-      context = context,
-      debug = debug,
-      seed = seed,
-      fit.idx = fit.idx
-    )
-    if (grepl("^Sample", context) && nL == 3L) {
-      fit$component_means <- c(0.15, 0.5, 1.5)
-    }
-    fit
-  }
-}
-
 test_that("optional H skips gracefully when H normalization fails", {
   inputs <- make_calibration_inputs(n_probes = 1500L, seed = 11L)
   local_mocked_bindings(

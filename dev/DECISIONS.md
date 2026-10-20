@@ -419,6 +419,60 @@ cite it, but it is kept locally, untracked (user, 2026-10-20). Those
 entries hold the outcomes; the full log is in git history, as
 `git show ae2f1ba:dev/code-review.md`.
 
+## 2026-10-20 — `bmiq_calibration_fixed()`: the legacy configuration as one file (0.1.3)
+
+`R/bmiq_calibration_fixed.R` is `bmiq_calibration()` cut to the Horvath
+legacy configuration, for the downstream package to vendor in place of
+`R/bmiq_calibration.R` (user, 2026-10-20). It stands alone: it shares no
+R code with the general file, and its helpers carry the `fixed_` prefix
+so both files can load into one package (a second `fit_mixture` would
+silently replace the first). The vendored-file code rules apply to it.
+
+Fixed, not arguments: `nL = 3` with H, `niter = 5`, `nfit = 20000`,
+`tol = 0.001`, `beta.maxit = 50`, `beta.score.tol = 1e-10`, the optional
+H policy, a failed sample becomes an `NA` row (samples are independent,
+so one cannot sink the run) and its index and error go in a warning. The
+gold is chosen by name (`gold = "horvath"`) from `FIXED_GOLD`, the fitted
+shapes, density crossings and class modes of `bmiq_gold_fit()` at its
+defaults, written
+by `data-raw/bmiq_gold_fixed.R` as hexadecimal floating-point literals.
+Hex, because R's decimal parser is not correctly rounded on every
+platform, so a 17-digit decimal could land one ulp off; a hex literal
+parses exactly. The decimal stands beside each as a comment.
+
+Cut: the nL = 2 path (`normalize_nl2`, the log-space maps), the raw gold
+vector and the prefit object with their checks, `th1.v`, `doH`,
+`h.policy`, `on.sample.error`, `failed.sample`, `debug` and every
+diagnostic, the result object (a plain matrix comes back; the samples
+that ran without H are named in the warning), `validate_em_settings`,
+`check_gold_fit`, `check_thresholds`, the dimension checks in the
+crossing search, and the responsibility-count diagnostic (so the
+responsibility matrix is never reordered). Kept call for call: the fit
+subset draw, the endpoint clip, the EM call, canonicalization by mean,
+the density crossings, the tail split, `map_beta_q`, the H glue, the
+±1e-12 clamp, and the gather/scatter blocks.
+
+Pinned by `tests/testthat/test-bmiq-fixed.R` with `identical()`: the
+stored Horvath numbers against the live `bmiq_gold_fit()`; the output
+against `bmiq_calibration(datM, horvath_goldstandard$goldstandard2)` on
+the six EPIC samples (20306 measured probes), on 11 synthetic samples
+(two gather/scatter blocks), and on the skipped-H path (both fitters
+mocked). The general function is untouched; the suite and the snapshots
+pass unchanged. The function is not in `dev/bitcheck-0.1.2.R`, which
+compares with 0.1.1, where it did not exist.
+
+Known: the EM's `std::lgamma` is the platform libm (chunk 2 above), so
+on another platform the live gold fit may differ from the stored numbers
+at the last ulp, and the identity test would say so. The stored numbers
+(fitted here, mingw gcc 14.2) are then the contract: with them, the gold
+side of `bmiq_calibration_fixed()` is the same on every platform, which
+the general function cannot promise.
+
+Measured on the six EPIC samples (load_all at -O2, median of 3): general
+with the raw gold 0.39 s, general with a prefit 0.32 s, fixed 0.35 s. The
+gold fit is all that is saved; the quantile map still dominates
+(`dev/to-do.md`, gold quantile table).
+
 ## 2026-09-25 — GPL (>= 3), with the upstream authors as `cph` (0.1.0)
 
 Recorded 2026-10-20, from the deleted `dev/relicense-plan.md`.

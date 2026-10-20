@@ -4,37 +4,6 @@
 # time-seeded .Random.seed in a session that has none. No kernel draws a
 # random number, so every export is marked rng = false.
 
-# Run f() from a session with no .Random.seed (none may be left behind),
-# then from a set seed (it must come back identical). The caller's own
-# state is restored on exit.
-expect_random_state_kept <- function(f) {
-  global <- globalenv()
-  had.seed <- exists(".Random.seed", envir = global, inherits = FALSE)
-  saved.seed <- if (had.seed) get(".Random.seed", envir = global)
-  on.exit(
-    if (had.seed) {
-      assign(".Random.seed", saved.seed, envir = global)
-    } else if (exists(".Random.seed", envir = global, inherits = FALSE)) {
-      rm(".Random.seed", envir = global)
-    },
-    add = TRUE
-  )
-
-  if (exists(".Random.seed", envir = global, inherits = FALSE)) {
-    rm(".Random.seed", envir = global)
-  }
-  f()
-  expect_false(exists(".Random.seed", envir = global, inherits = FALSE))
-
-  set.seed(20261020L)
-  before <- get(".Random.seed", envir = global)
-  f()
-  expect_identical(
-    get0(".Random.seed", envir = global, inherits = FALSE),
-    before
-  )
-}
-
 test_that("bmiq_calibration leaves the random state as found (raw gold)", {
   inputs <- make_calibration_inputs(n_probes = 500L, seed = 3L)
 

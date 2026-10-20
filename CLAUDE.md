@@ -37,8 +37,9 @@ those there without new evidence. Work in flight is tracked in
   testing and experimentation justify it; DECISIONS.md records what has
   been measured and why earlier attempts were rejected.
 - **The vendored files follow the downstream code rules.** A downstream
-  package copies `R/bmiq_calibration.R`, `R/quantile_norm.R`,
-  `src/bmiq_norm.cpp`, `src/quantile_norm.cpp` and `inst/COPYRIGHTS`,
+  package copies `R/bmiq_calibration.R` (or `R/bmiq_calibration_fixed.R`,
+  which stands alone), `R/quantile_norm.R`, `src/bmiq_norm.cpp`,
+  `src/quantile_norm.cpp` and `inst/COPYRIGHTS`,
   stripping only roxygen lines, so its rules hold here (DECISIONS.md,
   2026-10-20):
   - every Rcpp export is `// [[Rcpp::export(rng = false)]]`; no kernel

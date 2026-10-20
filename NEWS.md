@@ -1,3 +1,15 @@
+# betanorm 0.1.3
+
+* New `bmiq_calibration_fixed()`: `bmiq_calibration()` at its defaults (the
+  legacy three-state configuration) against a built-in gold-standard fit
+  chosen by name. `gold = "horvath"` is the fit of
+  `horvath_goldstandard$goldstandard2`, so nothing is refitted for the
+  gold. It takes only `datM`, `gold` and `verbose`, returns the calibrated
+  matrix, turns a failed sample into a row of `NA` (the warning gives its
+  index and the error), and warns which samples ran without H. Its output
+  is identical to `bmiq_calibration(datM, horvath_goldstandard$goldstandard2)`,
+  and its source file stands alone, for pipelines that copy the code.
+
 # betanorm 0.1.2
 
 * `bmiq_calibration()`, `bmiq_gold_fit()` and `quantile_norm()` leave the

@@ -161,6 +161,7 @@ fit <- bmiq_calibration(
 | `quantile_norm()` | Quantile-normalize matrix rows to a target distribution |
 | `bmiq_calibration()` | BMIQ-style calibration to a gold-standard beta profile |
 | `bmiq_gold_fit()` | Fit the gold-standard mixture once, for reuse across calls |
+| `bmiq_calibration_fixed()` | The legacy configuration against the built-in Horvath gold fit, as one standalone function |
 | `horvath_goldstandard` | Gold-standard probe annotation + mean betas |
 | `GPL21145_sample` | Example beta matrix for demos and tests |
 
