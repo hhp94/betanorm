@@ -183,6 +183,47 @@ The other methylCIPHERv2 divergences (no RNG/`nfit`, prefit-only gold, no
 debug/verbose, per-sample value scan, no warnings) are downstream choices
 for its own front door and stay there.
 
+## 2026-10-20 — The vendored files follow the downstream code rules (0.1.2)
+
+A downstream package vendors `R/bmiq_calibration.R`, `R/quantile_norm.R`,
+`src/bmiq_norm.cpp`, `src/quantile_norm.cpp` and `inst/COPYRIGHTS`, and its
+copy script strips roxygen lines and nothing else. Its code rules are
+therefore kept here, so the files copy with no further edit (CLAUDE.md
+invariants). One commit each:
+
+1. **`rng = false` on every Rcpp export.** The default wrapper's
+   `RNGScope` calls `GetRNGstate()`, which creates a time-seeded
+   `.Random.seed` in a session that has none. So `bmiq_calibration()`,
+   `bmiq_gold_fit()` and `quantile_norm()` each left one behind, although
+   `draw_fit_indices()` restores the caller's state around its own draw.
+   No kernel draws. Pinned by `test-random-state.R`.
+2. **`[[`, never `$`, in R/.** `$` partial-matches on lists. Before the
+   switch, the suite and the real-data calls ran under
+   `warnPartialMatchDollar = TRUE` with no partial match, so `[[` reads
+   the same fields. (`[[<-` on `NULL` builds an atomic vector where `$<-`
+   builds a list; every `diagnostic[[...]] <-` runs on a list.)
+3. **Exact matching, no `match.arg()`.** `h.policy`, `on.sample.error` and
+   `failed.sample` default to one string, checked by
+   `checkmate::assert_choice()`. The one user-visible change: an
+   abbreviation such as `"opt"` is now an error
+   (`test-option-matching.R`).
+4. **Calls outside base are qualified**, so the vendored code does not lean
+   on this package's `importFrom` lines. Those for stats and utils are gone
+   (`dbeta` was imported with no caller).
+5. **No Makevars.** They held the RcppArmadillo skeleton's flags
+   (`-fopenmp`, LAPACK, BLAS, Fortran libraries), left over from before
+   the port to plain Rcpp. Nothing in `src/` uses them.
+
+Evidence (`dev/bitcheck-0.1.2.R`): it installs with R CMD INSTALL, runs 24
+cases (real and synthetic calibration, raw gold and prefit, the H-failure
+option paths, the EM kernel, `quantile_norm()`) plus two runs on 0.1.1's
+saved gold fits, and compares with 0.1.1 by `identical(num.eq = FALSE)`.
+After every step all 26 values were identical; the only text change is two
+warnings, which now name `result[["failures"]]` and `result[["h.applied"]]`.
+After the Makevars went, the same held with R's default -O2 against 0.1.1
+built the same way, and 0.1.1 itself is identical at -O2 and -O3.
+Snapshots unchanged throughout.
+
 ## Legacy compatibility (predates this log; do not drift)
 
 - `nL = 3`, `niter = 5` is the intentional legacy BMIQ configuration

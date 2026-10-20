@@ -35,6 +35,19 @@ those there without new evidence. Work in flight is tracked in
 - Execution starts **serial**. Parallelism is added only after extensive
   testing and experimentation justify it; DECISIONS.md records what has
   been measured and why earlier attempts were rejected.
+- **The vendored files follow the downstream code rules.** A downstream
+  package copies `R/bmiq_calibration.R`, `R/quantile_norm.R`,
+  `src/bmiq_norm.cpp`, `src/quantile_norm.cpp` and `inst/COPYRIGHTS`,
+  stripping only roxygen lines, so its rules hold here (DECISIONS.md,
+  2026-10-20):
+  - every Rcpp export is `// [[Rcpp::export(rng = false)]]`; no kernel
+    draws a random number;
+  - `[[`, never `$`, in R/ (tests may use `$`);
+  - arguments match exactly: a choice is one default string checked with
+    `checkmate::assert_choice()`, never `match.arg()`;
+  - calls outside base are qualified (`stats::qbeta`), never imported;
+  - no `src/Makevars` or `src/Makevars.win`: the package builds with R's
+    default flags.
 
 ## Workflow
 

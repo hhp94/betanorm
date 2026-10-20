@@ -1,3 +1,19 @@
+# betanorm 0.1.2
+
+* `bmiq_calibration()`, `bmiq_gold_fit()` and `quantile_norm()` leave the
+  random state as they found it. Before, a session with no `.Random.seed`
+  had one afterwards, created by Rcpp's default wrapper around the C++
+  kernels; every kernel is now exported with `rng = false`.
+* `h.policy`, `on.sample.error` and `failed.sample` need an exact value:
+  an abbreviation such as `h.policy = "opt"` is now an error instead of
+  being completed by `match.arg()`. The defaults are unchanged.
+* `src/Makevars` and `src/Makevars.win` are gone. They only added OpenMP,
+  LAPACK and BLAS flags that no code used, so the package now builds with
+  R's default flags.
+* Results are bit-identical to 0.1.1 and the numeric snapshots are
+  unchanged. Two warnings are reworded: they now point to
+  `result[["failures"]]` and `result[["h.applied"]]`.
+
 # betanorm 0.1.1
 
 * Hardened the internal C++ kernels against malformed arguments, none of
