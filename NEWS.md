@@ -10,6 +10,9 @@
 * `src/Makevars` and `src/Makevars.win` are gone. They only added OpenMP,
   LAPACK and BLAS flags that no code used, so the package now builds with
   R's default flags.
+* `quantile_norm()` refuses an `obj` holding `Inf` or `-Inf`, as its
+  documentation already required. Before, they were ranked like any other
+  value and mapped to the ends of `target`.
 * Results are bit-identical to 0.1.1 and the numeric snapshots are
   unchanged. Two warnings are reworded: they now point to
   `result[["failures"]]` and `result[["h.applied"]]`.

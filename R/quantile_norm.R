@@ -30,9 +30,14 @@ quantile_norm <- function(obj, target) {
   checkmate::assert_matrix(
     obj,
     mode = "numeric",
-    any.missing = FALSE,
     min.rows = 1L,
     min.cols = 1L
+  )
+  checkmate::assert_numeric(
+    obj,
+    any.missing = FALSE,
+    finite = TRUE,
+    .var.name = "obj"
   )
   checkmate::assert_numeric(
     target,
