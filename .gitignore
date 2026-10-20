@@ -9,3 +9,24 @@ src/*.dylib
 inst/doc
 *.tar.gz
 .DS_Store
+
+# dev/ is opt-in: a file is tracked only when it is listed here (see
+# dev/DECISIONS.md, "dev/ is opt-in"). Directories are re-included only so
+# that git looks inside them; their files stay ignored unless listed.
+/dev/**
+!/dev/**/
+!/dev/DECISIONS.md
+!/dev/to-do.md
+!/dev/code-review.md
+!/dev/bitcheck-0.1.2.R
+!/dev/bmiq-calibration-legacy.R
+!/dev/MEAT_1.24.0/MEAT/DESCRIPTION
+!/dev/MEAT_1.24.0/MEAT/LICENSE
+!/dev/MEAT_1.24.0/MEAT/R/data_calibration.R
+!/dev/preprocessCore/DESCRIPTION
+!/dev/preprocessCore/R/quantile_extensions.R
+!/dev/preprocessCore/src/qnorm.c
+!/dev/preprocessCore/src/qnorm.h
+!/dev/boost_math_exports.cpp
+!/dev/inst/include/bmiqpp/boost_math.hpp
+!/dev/test-boost-math.R

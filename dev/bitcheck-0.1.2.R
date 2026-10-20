@@ -1,4 +1,5 @@
-# Bit-identity check for the 0.1.2 cleanup (see dev/0.1.2.md).
+# Bit-identity check for the 0.1.2 cleanup (see dev/DECISIONS.md,
+# "The vendored files follow the downstream code rules").
 #
 # Usage, from the package root (R_LIBS_USER must reach Rcpp and checkmate):
 #   Rscript dev/bitcheck-0.1.2.R <outdir>                 # capture only
@@ -13,7 +14,7 @@
 # identical(num.eq = FALSE), i.e. bitwise on doubles, and reruns the
 # calibration on the gold fits saved by the baseline (a prefit made with the
 # older version must give the older numbers). The random-state footprint is
-# reported apart: phase 1 changes it on purpose.
+# reported apart: 0.1.2's `rng = false` exports change it on purpose.
 
 args <- commandArgs(trailingOnly = TRUE)
 stopifnot(

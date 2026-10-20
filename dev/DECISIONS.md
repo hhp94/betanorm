@@ -384,6 +384,54 @@ data value changed.
   removed `fit.policy`, and it no longer claims legacy numbers or
   presents `nL = 2` as the way to run EM longer.
 
+## 2026-10-20 — dev/ is opt-in
+
+`.gitignore` ignores everything under `dev/` and lists each tracked file.
+A file is opted in only when CLAUDE.md, this log, `dev/to-do.md` or
+`inst/COPYRIGHTS` cites it, or the gate runs it. Scratch work in `dev/`
+stays out of git by default. Tracked:
+
+- records: `DECISIONS.md`, `to-do.md`, `code-review.md`;
+- the gate: `bitcheck-0.1.2.R`;
+- reference copies (COPYRIGHTS, "Legacy compatibility"):
+  `bmiq-calibration-legacy.R`; MEAT 1.24.0 cut to its calibration
+  (`MEAT_1.24.0/MEAT/R/data_calibration.R`); and `preprocessCore/` cut
+  to what the quantile normalizer derives from (`R/quantile_extensions.R`,
+  `src/qnorm.c`, `src/qnorm.h`). Each copy keeps its `DESCRIPTION`, and
+  MEAT its `LICENSE`, so the upstream licence notice stays with the code;
+- prior art for the Boost bench in `to-do.md`: `boost_math_exports.cpp`,
+  `inst/include/bmiqpp/boost_math.hpp`, `test-boost-math.R`.
+
+Deleted: the finished plans (`0.1.2.md`, whose outcome is the 0.1.2
+entry above, and `relicense-plan.md`, whose reasons are the next entry);
+the July audit `opus_audit1.md`, superseded by the code review; the rest
+of the MEAT 1.24.0 and preprocessCore copies, and a loose duplicate of
+MEAT's calibration (`meat_data_calibration.R`); the pre-rewrite
+`with_nl2/`; the July benchmarks and their output (`benchmark.R`,
+`bench-qnorm.R`, `tmp/`); `Exported Items.bib`, whose three papers
+DESCRIPTION and the help pages already cite; and
+`slideimp_description.txt`. Older entries and `code-review.md` still cite
+some of them. Each is in git history, for example
+`git show 7110321:dev/with_nl2/bmiq-calibration.R`.
+
+## 2026-09-25 — GPL (>= 3), with the upstream authors as `cph` (0.1.0)
+
+Recorded 2026-10-20, from the deleted `dev/relicense-plan.md`.
+
+- betanorm was written with preprocessCore (LGPL >= 2) and RPMM (GPL >= 2)
+  open as the reference, and the BMIQ calibration with Teschendorff's
+  BMIQ and Horvath's BMIQcalibration. Code translated from those sources
+  is derived from them. LGPL allows a move to GPL and GPL >= 2 does not
+  allow MIT, so the MIT licence was wrong as declared. The user accepted
+  GPL; a clean-room rewrite to keep MIT was not wanted.
+- `GPL (>= 3)`, not GPL-2 alone: it covers LGPL >= 2, GPL >= 2, and the
+  GPL-3 copies of BMIQ in ChAMP and wateRmelon.
+- The upstream authors are `cph` only, not `aut` or `ctb`: they did not
+  write this package. A paper's authors are cited, not credited as `cph`,
+  unless their code was the reference.
+- No copy of the GPL text: R ships it. Each derived file names its origin
+  in a header comment, and `inst/COPYRIGHTS` keeps the per-file record.
+
 ## Legacy compatibility (predates this log; do not drift)
 
 - `nL = 3`, `niter = 5` is the intentional legacy BMIQ configuration
@@ -394,7 +442,8 @@ data value changed.
   vector) — pinned by `test-cpp-contract.R`.
 - **The configuration is legacy, the numbers are not.** The rewrite
   (`f536c1d`, 2026-07-11) departs from legacy BMIQ code
-  (`dev/bmiq-calibration-legacy.R`, MEAT) on purpose, in three steps.
+  (`dev/bmiq-calibration-legacy.R`, and MEAT 1.24.0's
+  `dev/MEAT_1.24.0/MEAT/R/data_calibration.R`) on purpose, in three steps.
   Recorded 2026-10-20 (code review, chunk 3); the roxygen Details say the
   same.
   1. Class thresholds are weighted-density crossings

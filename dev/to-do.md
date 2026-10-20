@@ -72,7 +72,8 @@ the map alone: ~3.1x (~2.5x at 8 threads; 2000 samples ~2.4 min -> ~1 min).
 |diff| <= 1e-8 AND end-to-end >= 2x at 8 threads; otherwise record in
 DECISIONS.md as measured-and-rejected.
 
-**Mechanics:** bench lives in `dev/boost_bench/` (tracked, not shipped);
+**Mechanics:** bench lives in `dev/boost_bench/` (not shipped; opt each
+file worth keeping into `.gitignore`);
 compile via `Rcpp::sourceCpp` (standard -O2 Makeconf flags — NEVER -O0
 for header-only Boost; have the harness print its effective flags).
 Threading stays inside pure C++ math (Boost `ignore_error` policies, no
