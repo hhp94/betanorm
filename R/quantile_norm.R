@@ -9,6 +9,9 @@
 #' ranked and mapped onto `target` (Bolstad equal-length indexing when
 #' `length(target) == ncol(obj)`; linear quantile interpolation otherwise).
 #'
+#' With one column (`ncol(obj) == 1`) a row has nothing to rank against, so
+#' every value maps to `min(target)`.
+#'
 #' @param obj Numeric matrix with samples in rows and variables in columns.
 #'   Must be finite with no missing values.
 #' @param target Numeric vector giving the reference distribution. Must be

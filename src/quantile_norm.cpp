@@ -185,6 +185,9 @@ Rcpp::NumericMatrix qnorm_target_rows_cpp(
     const double *target_ptr = sorted_target.data();
     double *xt_data = xt.begin();
 
+    // One variable: a sample has nothing to rank against, so every value
+    // maps to the smallest target value (the unequal path would divide by
+    // n - 1 = 0).
     if (n == 1)
     {
         const double v = target_ptr[0];

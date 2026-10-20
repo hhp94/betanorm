@@ -24,6 +24,10 @@ Minimal, no-missing-data port of
 ranked and mapped onto \code{target} (Bolstad equal-length indexing when
 \code{length(target) == ncol(obj)}; linear quantile interpolation otherwise).
 }
+\details{
+With one column (\code{ncol(obj) == 1}) a row has nothing to rank against, so
+every value maps to \code{min(target)}.
+}
 \references{
 Bolstad BM, Irizarry RA, Astrand M, Speed TP (2003).
 A comparison of normalization methods for high density oligonucleotide
