@@ -37,7 +37,10 @@ rows, CpGs in columns. Values must be finite, non-missing, and in
 prefitted \code{\link[=bmiq_gold_fit]{bmiq_gold_fit()}} object. The gold standard is consumed purely
 distributionally, so the vector does not need to align with (or match
 the length of) the columns of \code{datM}; a prefitted object lets one gold
-fit be reused across multiple calls.}
+fit be reused across multiple calls. With a prefitted object, \code{th1.v} is
+ignored and \code{nfit}, \code{niter}, \code{tol}, \code{beta.maxit} and \code{beta.score.tol}
+apply to the sample fits only: the gold was fitted with the values in
+its own \code{settings}, and the result's \code{settings} record this call's.}
 
 \item{nL}{Number of mixture components: \code{3} for unmethylated /
 intermediate / methylated (default, legacy three-state BMIQ), or \code{2}

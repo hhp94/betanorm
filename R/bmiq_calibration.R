@@ -854,7 +854,10 @@ bmiq_gold_fit <- function(
 #'   prefitted [bmiq_gold_fit()] object. The gold standard is consumed purely
 #'   distributionally, so the vector does not need to align with (or match
 #'   the length of) the columns of `datM`; a prefitted object lets one gold
-#'   fit be reused across multiple calls.
+#'   fit be reused across multiple calls. With a prefitted object, `th1.v` is
+#'   ignored and `nfit`, `niter`, `tol`, `beta.maxit` and `beta.score.tol`
+#'   apply to the sample fits only: the gold was fitted with the values in
+#'   its own `settings`, and the result's `settings` record this call's.
 #' @param nL Number of mixture components: `3` for unmethylated /
 #'   intermediate / methylated (default, legacy three-state BMIQ), or `2`
 #'   for unmethylated / methylated only. Choose `nL` by whether the
