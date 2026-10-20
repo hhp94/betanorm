@@ -19,17 +19,16 @@ knitr::opts_chunk$set(
 <!-- badges: end -->
 
 **betanorm** is a small toolkit of fast C++ array-normalization utilities
-([Rcpp](https://cran.r-project.org/package=Rcpp) /
-[RcppArmadillo](https://cran.r-project.org/package=RcppArmadillo)):
+([Rcpp](https://cran.r-project.org/package=Rcpp)):
 
 - **Quantile normalization** - map each sample row onto a target distribution
   (no missing values; a focused port of
   `preprocessCore::normalize.quantiles.use.target()`).
 - **BMIQ-style gold-standard calibration** - for DNA methylation beta matrices
   when a pipeline expects beta-mixture quantile calibration to a reference
-  profile. The default path (`nL = 3`, `niter = 5`) is intentionally
-  legacy-compatible, not a claim that five outer EM steps are statistical
-  convergence.
+  profile. The default path (`nL = 3`, `niter = 5`) follows the legacy
+  BMIQ configuration on purpose; it is not a claim that five outer EM steps
+  are statistical convergence.
 
 ## Installation
 
@@ -65,32 +64,37 @@ beta mixture per sample and maps components toward a gold-standard profile.
 Use this when you need that procedure (for example, clock-style workflows); prefer
 `quantile_norm()` when a plain target distribution is enough.
 
-Built-in example data: gold-standard annotation and a small beta matrix
-(6 samples x ~21k probes).
+Built-in example data: gold-standard annotation and a small EPIC beta
+matrix (6 samples x ~21k probes). The 1062 gold-standard probes that the
+EPIC array does not measure are filled with 0, so drop them first; the gold
+vector does not need to match the columns.
 
 ```{r bmiq-data}
 data(horvath_goldstandard)
 data(GPL21145_sample)
 
-dim(GPL21145_sample)
+measured <- colSums(GPL21145_sample == 0) < nrow(GPL21145_sample)
+datM <- GPL21145_sample[, measured]
+dim(datM)
 head(horvath_goldstandard$goldstandard2, 3)
 ```
 
 ### Legacy defaults (`nL = 3`, `niter = 5`)
 
 Three-state BMIQ with a hard outer EM cap of **five** iterations is the
-intentional default. That pair reproduces common legacy implementations
-(Horvath-style / MEAT-style clocks and similar pipelines). **Do not raise
-`niter` on the `nL = 3` path** unless you deliberately want results that
-diverge from those implementations; `bmiq_calibration()` warns if you do.
+intentional default, the configuration of common legacy implementations
+(Horvath-style / MEAT-style clocks and similar pipelines). It is a legacy
+configuration, not legacy output: the class thresholds, the component fits
+and the H join differ from legacy code on purpose (see Details in
+`?bmiq_calibration`).
 
-If you want the mixture EM to run longer or toward convergence, switch to
-**`nL = 2`** (U/M only; no intermediate H step) and raise `niter` / tighten
-`fit.policy` there instead.
+Raising `niter` runs either model further toward convergence. With
+`nL = 3`, `bmiq_calibration()` then warns, only because the results depart
+from five-iteration output.
 
 ```{r calibrate}
 fit <- bmiq_calibration(
-  datM = GPL21145_sample,
+  datM = datM,
   goldstandard.beta = horvath_goldstandard$goldstandard2,
   verbose = FALSE
 )
@@ -102,19 +106,38 @@ dim(calibrated)
 
 ### Two-component path (`nL = 2`)
 
-Use `nL = 2` for unmethylated / methylated only (`doH` defaults to `FALSE`)
-and whenever you prefer longer EM rather than the legacy five-iteration
-three-state cap.
+Use `nL = 2` when an intermediate component is not appropriate for your
+data: unmethylated / methylated only (`doH` defaults to `FALSE`). Choosing
+`nL` is a modeling decision, separate from how far EM runs (`niter`).
 
 ```{r calibrate-nl2}
 fit2 <- bmiq_calibration(
-  datM = GPL21145_sample,
+  datM = datM,
   goldstandard.beta = horvath_goldstandard$goldstandard2,
   nL = 2L,
   niter = 25L,
   verbose = FALSE
 )
 fit2
+```
+
+### Fit the gold standard once
+
+The gold standard is used only through its fitted mixture, so
+`bmiq_gold_fit()` fits it once and the result stands in for the gold
+vector in any number of calls, for example when calibrating a large matrix
+in chunks of samples. Each chunk can also run in its own process (for
+example with `parallel::parLapply()`): ship only its rows and the small
+gold fit.
+
+```{r gold-prefit}
+gold.fit <- bmiq_gold_fit(horvath_goldstandard$goldstandard2, verbose = FALSE)
+
+chunks <- split(seq_len(nrow(datM)), rep(1:2, each = 3))
+parts <- lapply(chunks, function(rows) {
+  as.matrix(bmiq_calibration(datM[rows, ], gold.fit, verbose = FALSE))
+})
+identical(do.call(rbind, unname(parts)), calibrated)
 ```
 
 ### Sample-level error handling
@@ -127,8 +150,7 @@ fit <- bmiq_calibration(
   goldstandard.beta = gold,
   on.sample.error = "continue",
   failed.sample = "NA", # or "original"
-  h.policy = "optional", # keep U/M if H fails
-  fit.policy = "usable" # accept finite (not fully converged) fits
+  h.policy = "optional" # keep U plus upper-M if H fails
 )
 ```
 
@@ -138,6 +160,7 @@ fit <- bmiq_calibration(
 |----------|------|
 | `quantile_norm()` | Quantile-normalize matrix rows to a target distribution |
 | `bmiq_calibration()` | BMIQ-style calibration to a gold-standard beta profile |
+| `bmiq_gold_fit()` | Fit the gold-standard mixture once, for reuse across calls |
 | `horvath_goldstandard` | Gold-standard probe annotation + mean betas |
 | `GPL21145_sample` | Example beta matrix for demos and tests |
 
