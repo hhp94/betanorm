@@ -9,6 +9,10 @@ A numeric matrix with 6 samples (rows) and 21368 CpGs (columns).
 Column names match \code{horvath_goldstandard[["Name"]]}. Values are in
 \eqn{[0, 1]}.
 }
+\source{
+NCBI GEO, platform GPL21145 (Illumina MethylationEPIC):
+\url{https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GPL21145}.
+}
 \usage{
 GPL21145_sample
 }

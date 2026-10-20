@@ -45,5 +45,8 @@
 #' data(GPL21145_sample)
 #' dim(GPL21145_sample)
 #'
+#' @source NCBI GEO, platform GPL21145 (Illumina MethylationEPIC):
+#'   <https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GPL21145>.
+#'
 #' @keywords datasets
 "GPL21145_sample"

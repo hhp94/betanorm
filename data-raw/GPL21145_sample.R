@@ -6,6 +6,8 @@ if (!file.exists("data-raw/server_matrix.csv.gz")) {
   R.utils::gzip("data-raw/server_matrix.csv", remove = TRUE)
 }
 
+# server_matrix.csv: samples downloaded from NCBI GEO, platform GPL21145
+# (https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GPL21145).
 GPL21145_sample_raw <- read_csv("data-raw/server_matrix.csv.gz")
 
 stopifnot(isTRUE(anyDuplicated(horvath_goldstandard$Name) == 0))
