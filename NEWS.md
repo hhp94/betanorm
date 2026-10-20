@@ -17,10 +17,26 @@
   fit did not improve the likelihood, the component status in the
   `debug = TRUE` diagnostics is now that of the fit the shapes came from
   (for example `"max_iter"`). Before, it always said `"converged"`.
-* Results are bit-identical to 0.1.1. One numeric snapshot is redone, for
-  the component status above only; its numbers are unchanged. Two warnings
-  are reworded: they now point to `result[["failures"]]` and
-  `result[["h.applied"]]`.
+* `bmiq_calibration()` and `bmiq_gold_fit()` draw their fit subsets under
+  R's default random-number generator, so the results no longer depend on
+  the session's `RNGkind()`. Before, a session using another kind (for
+  example `"L'Ecuyer-CMRG"`, which parallel workers often set) got
+  different calibrated values. The caller's generator is restored as
+  before.
+* `bmiq_calibration()` checks a prefitted `bmiq_gold_fit` (its `nL`,
+  shapes, thresholds and modes) before calibrating. Before, a malformed
+  one made every sample fail with a misleading error, or gave an all-`NA`
+  result under `on.sample.error = "continue"`.
+* With a raw gold vector, `bmiq_calibration()` fits the gold standard
+  before allocating the output matrix, so a bad gold fails sooner.
+* The documentation now says that the defaults follow the legacy BMIQ
+  configuration but do not reproduce its numbers, and why; that a skipped
+  H step leaves the H class unchanged as well as lower-M (the per-sample
+  message says so too); and which settings a prefitted gold ignores.
+* Results are bit-identical to 0.1.1 under R's default random-number
+  generator. One numeric snapshot is redone, for the component status
+  above only; its numbers are unchanged. Two warnings are reworded: they
+  now point to `result[["failures"]]` and `result[["h.applied"]]`.
 
 # betanorm 0.1.1
 

@@ -314,6 +314,49 @@ iterations in the nL = 2 snapshot case, for one component or both), with
 every step still accepted, i.e. at the noise floor. The cost is per
 component, not per observation.
 
+## 2026-10-20 — Code review, chunk 3: bmiq_calibration.R
+
+The `/code-review` (`high`) of `R/bmiq_calibration.R`; findings and
+dispositions in `dev/code-review.md`. Every fix went through the gate:
+suite passes, snapshots as after chunk 2, bitcheck values as after chunk 2
+(only `em_nL2`'s `fit_status` differs from 0.1.1, from that fix).
+
+Changed, no number moved in a default session:
+
+- **The fit subset is drawn under R's default generator.**
+  `draw_fit_indices()` seeded the caller's `RNGkind()`, so the gold and
+  sample subsets, and every calibrated value, followed it: up to 0.021
+  under "L'Ecuyer-CMRG" and 0.0056 under `sample.kind = "Rounding"` on a
+  synthetic sample. Legacy code had the same dependence. `set.seed()` now
+  names Mersenne-Twister / Inversion / Rejection, and the restore already
+  in place puts the caller's kind back (the kind lives in `.Random.seed`).
+  Pinned in `test-random-state.R`. A session that removed its
+  `.Random.seed` by hand after choosing another kind is left on the
+  default kind; nothing else can reach that state.
+- **A prefitted gold has an owner.** `check_gold_fit()` checks a
+  user-supplied `bmiq_gold_fit` (`nL`, `a`, `b`, `thresholds`, the two
+  modes) at the entry point. A fresh `bmiq_gold_fit()` result satisfies it
+  by construction, so the raw-vector path does not run it and there is
+  still one owner per invariant.
+- **The empty-H check is gone** (with the no-op `unique()`). It was a
+  second owner of "class 2 is not empty", which `require_all_classes()`
+  already owns. "Validation: one owner per invariant" keeps the
+  *reachable* class-count checks; this one was not reachable.
+- **The gold is fitted before the output is allocated**, so a bad gold
+  fails before an n x p matrix exists.
+- Docs: the defaults are a legacy configuration, not legacy numbers (see
+  "Legacy compatibility" below); a skipped H step also leaves the H class
+  unchanged; a prefitted gold ignores the call's EM settings.
+
+Kept as they are:
+
+- **`result[["call"]]` is `match.call()`.** Under `do.call()` it holds the
+  argument values (1.79 MB for a 24 KB `datM`), but a plain call stores
+  symbols, nothing reads the field, and removing it is a visible change.
+- **Each sample's debug diagnostics hold the shared fit indices.** One
+  vector in memory; only `saveRDS()` repeats it per sample. Moving it
+  would change the diagnostics shape for a debug-only cost.
+
 ## Legacy compatibility (predates this log; do not drift)
 
 - `nL = 3`, `niter = 5` is the intentional legacy BMIQ configuration

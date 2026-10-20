@@ -49,8 +49,12 @@ are the evidence; a coverage gap found in a chunk gets a test there).
   user took every proposal: fixed 2 and 4 (`1186b03`, one snapshot redone
   for a status string, numbers identical), logged 1 and 6, kept 3, 5 and
   7. Outcome in DECISIONS.md (2026-10-20, chunk 2).
-- [ ] 3. bmiq_calibration.R
-- [ ] 4. package glue (optional)
+- [x] 3. bmiq_calibration.R: reviewed 2026-10-20 (`high`), 9 findings.
+  The user took every proposal: fixed 1, 3, 8 and 9, documented 2, 4 and
+  5, kept 6 and 7. No number moves in a default session. Outcome in
+  DECISIONS.md (2026-10-20, chunk 3, and "Legacy compatibility").
+- [ ] 4. package glue (optional). Add `README.Rmd`/`README.md`: see the
+  chunk 3 side observation.
 
 ## Findings
 
@@ -180,3 +184,148 @@ Dispositions (the user took every proposal above):
 - 3, 5 and 7 **kept as they are**, with reasons in DECISIONS.md.
 - At the user's request, a new to-do: one up-front scan of the input
   matrix (`dev/to-do.md`).
+
+### Chunk 3: `R/bmiq_calibration.R`
+
+Two findings touch DECISIONS.md, and neither overturns it. Finding 2 sits
+next to "Legacy compatibility (do not drift)". That entry pins the
+`nL = 3`, `niter = 5` configuration. The H anchors differ from legacy
+code, but they already did in the rewrite (`f536c1d`), before the log
+began, so nothing has drifted since; the divergence was simply never
+written down. Finding 8 sits next to "Validation: one owner per
+invariant", which keeps the *reachable* class-count checks. The empty-H
+check is unreachable, and it is a second owner of "class 2 is not
+empty", so the rule asks for its removal. Checks ran on the -O3 build the
+chunk 2 bitcheck installed. Class in brackets, then the proposal.
+
+1. **The fit subset depends on the caller's RNG kind**
+   (`R/bmiq_calibration.R:412`) [bug; moves numbers only in a session
+   with a non-default RNG kind]. `draw_fit_indices()` calls
+   `set.seed(seed)` with the caller's kind, so both the gold subset and
+   the sample subset follow `RNGkind()`. Measured on one synthetic
+   3000-probe sample: under `RNGkind("L'Ecuyer-CMRG")` (which parallel
+   and future workers set) the calibrated values move by up to 0.021,
+   and under `sample.kind = "Rounding"` by up to 0.0056. A chunked
+   parallel run then disagrees with the serial run. Legacy code has the
+   same dependence (`set.seed(1)`). Fix: `set.seed(seed, kind =
+   "Mersenne-Twister", normal.kind = "Inversion", sample.kind =
+   "Rejection")`. That is R's default, so default sessions, the bitcheck
+   and existing prefits stay bit-identical. The restore that is already
+   there puts the caller's kind back, because the kind is stored in
+   `.Random.seed`. Proposed: fix, with a test that a non-default kind
+   gives the default result and that `RNGkind()` is unchanged afterwards.
+2. **The H anchors drop the legacy gap patching**
+   (`R/bmiq_calibration.R:1256`) [settled in the rewrite, not recorded;
+   moves a number if changed]. Both legacy references
+   (`dev/bmiq-calibration-legacy.R:309-314`, MEAT) offset the anchors by
+   `deltaUH`/`deltaHM`. Here H is glued straight to the calibrated U
+   maximum and the upper-M minimum. The rewrite did this on purpose: the
+   comment in `dev/with_nl2/bmiq-calibration.R:1494` reads "no raw-gap
+   carry into output". The comment was later dropped, and DECISIONS.md
+   never recorded the change. One side effect: the outer H probes tie
+   with the probes on the far side of each join (3000 distinct inputs
+   gave 2998 distinct outputs). This is one of several deliberate
+   departures from legacy numbers: density-crossing thresholds instead of
+   legacy's subset midpoints, a Newton EM with an ascent guard instead of
+   BFGS / Nelder-Mead, and the continuous H join. Meanwhile the roxygen
+   says "defaults target legacy BMIQ compatibility", and the README says
+   the defaults "reproduce" legacy implementations. Proposed: keep the
+   map. Record the divergences in DECISIONS.md, restore a one-line
+   comment at the anchors (the downstream copy keeps comments), and
+   reword that roxygen sentence to say the *configuration* is legacy, not
+   the numbers. The README goes to chunk 4.
+3. **A prefit gold is checked only for its class and `nL`**
+   (`R/bmiq_calibration.R:998`) [validation gap; no number moves]. `a`,
+   `b`, `thresholds` and the two modes are used per sample unchecked. An
+   object saved by another version, or edited by hand, makes every
+   sample fail with a misleading threshold error. Under `"continue"` the
+   result is an all-NA matrix with one warning. A `NULL` `nL` gives
+   "argument is of length zero". By the one-owner rule, the user-facing
+   entry point owns the shape of user arguments, and nothing owns this
+   one today. Proposed: fix with one check in the prefit branch. It would
+   require: `nL` in {2, 3}; `a` and `b` of length `nL`, finite and
+   positive; `thresholds` through `check_thresholds(require.unit.interval
+   = TRUE)`; modes finite in [0, 1]. Add a test. The downstream is
+   prefit-only, so it benefits too.
+4. **With a prefit gold the call's EM settings don't reach the gold**
+   (`R/bmiq_calibration.R:1513`) [documentation; no number moves]. The
+   `niter` doc says it governs "the gold-standard fit and each sample
+   fit", and `result[["settings"]]` records the call's values as though
+   they applied to the gold. The gold's own settings are in the prefit's
+   `settings`. Only `th1.v` is documented as ignored. Proposed: a doc
+   fix. Say once, in the `goldstandard.beta` doc, that with a prefit only
+   the sample fits use `nfit`, `niter`, `tol` and `beta.*`, and that the
+   gold's own values are in its `settings`. Leave the result as it is.
+5. **An optional H skip also leaves the H class raw**
+   (`R/bmiq_calibration.R:1297`) [documentation; no number moves]. The
+   `h.policy` doc and the verbose message mention only lower-M. The code,
+   and legacy `doH = FALSE`, also leave every class-2 probe unchanged.
+   `dev/opus_audit1.md` said the same. Proposed: fix the `h.policy` doc,
+   the details paragraph and the message ("H class and lower-M left
+   unchanged"). The warning and `print()` say "(U plus upper-M)", which
+   is accurate, so they stay.
+6. **`result[["call"]]` carries the data under `do.call()`**
+   (`R/bmiq_calibration.R:911`) [efficiency; no number moves].
+   `match.call()` inlines argument values when the function is called
+   through `do.call()`. Measured: a 1.79 MB call object for a 24 KB
+   `datM`. The field is undocumented and nothing reads it. Proposed:
+   leave it. A plain call stores symbols, and removing a returned field
+   is a visible change.
+7. **`debug = TRUE` repeats the fit indices for every sample**
+   (`R/bmiq_calibration.R:555`) [efficiency; debug only]. Every sample's
+   diagnostics hold the same `sample.fit.idx`. In memory that is one
+   shared vector, but `saveRDS()` writes it once per sample (about 160 MB
+   at 2000 x 20000). Proposed: leave it; moving it would change the
+   diagnostics shape for a debug-only cost.
+8. **`unique()` on disjoint sets, and an unreachable empty-H check**
+   (`R/bmiq_calibration.R:1245`) [cleanup; bit-identical]. Class 2 and
+   lower-M (class 3) never overlap, so `unique(c(...))` is `c(...)` in
+   the same order. `require_all_classes()` already guarantees class 2 is
+   not empty. Proposed: fix by dropping both, per the one-owner rule
+   (see above).
+9. **The output matrix is allocated before the gold fit**
+   (`R/bmiq_calibration.R:978`) [efficiency; bit-identical]. A bad raw
+   gold vector, or a failed gold EM, stops the call only after the full
+   n x p NA matrix is allocated and filled. At EPIC x 2000 samples that is
+   about 14 GB. Proposed: fix by moving the gold block above the
+   allocation. The datM scan and the probe-count check stay first. The
+   gold draw restores the RNG state, so the sample subset is unchanged.
+
+Side observation, for chunk 4: `README.Rmd`/`README.md` use
+`fit.policy`, an argument that no longer exists. Line 131 passes it to a
+call, and with no `...` that call errors with "unused argument". The
+README also advises switching to `nL = 2` to run EM longer, which the
+`nL` doc argues against, and it says the defaults "reproduce" legacy
+implementations (see 2).
+
+Dispositions (the user took every proposal above). Each fix is its own
+commit through the gate: suite passes (264), snapshots as after chunk 2,
+bitcheck values as after chunk 2 (only `em_nL2`'s `fit_status` differs
+from 0.1.1, from `1186b03`).
+
+- 1 **fixed** (`21a0be1`): `set.seed()` names R's default kinds. The new
+  test in `test-random-state.R` failed on the old code (both value
+  checks) and checks that the caller's kind is back afterwards. The one
+  behaviour change outside a default session: a session that removed its
+  `.Random.seed` by hand after picking another kind is left on the
+  default kind (confirmed; logged in DECISIONS.md).
+- 3 **fixed** (`86aa144`): `check_gold_fit()` in the prefit branch. The
+  nL-mismatch message is unchanged. The new test in `test-gold-fit.R`
+  failed on the old code. 0.1.1's saved gold fits pass the check and give
+  the 0.1.1 numbers.
+- 8 **fixed** (`bf86de6`): `c()` in place of `unique(c())`, and the empty-H
+  stop removed, with a comment saying why the set cannot be empty.
+- 9 **fixed** (`414d711`): the gold block now runs right after the `datM`
+  checks; the messages come in the same order.
+- 5 **documented** (`c23dd19`): `h.policy` doc, Details and the per-sample
+  message. The bitcheck shows that message as the only new text change.
+- 4 **documented** (`dc41ac6`): in the `goldstandard.beta` doc of
+  `bmiq_calibration()` only. `bmiq_gold_fit()` inherits `niter` and the
+  rest, so their docs stay as they are.
+- 2 **documented** (`126df97`): the title paragraph and a new Details
+  paragraph say the defaults are a legacy configuration, not legacy
+  numbers, and name the three steps that differ. A comment is back at the
+  H anchors. DECISIONS.md "Legacy compatibility" records the three steps.
+- 6 and 7 **kept as they are**, with reasons in DECISIONS.md.
+- NEWS.md 0.1.2: a bullet each for 1, 3 and 9 and one for the docs. The
+  bit-identity line now says "under R's default random-number generator".
