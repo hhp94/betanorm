@@ -409,7 +409,15 @@ draw_fit_indices <- function(n, size, seed) {
       add = TRUE
     )
   }
-  set.seed(seed)
+  # Pin R's default generator so the subset does not follow the caller's
+  # RNGkind() (parallel workers often set "L'Ecuyer-CMRG"). The kind is
+  # stored in .Random.seed, so the restore above puts the caller's back.
+  set.seed(
+    seed,
+    kind = "Mersenne-Twister",
+    normal.kind = "Inversion",
+    sample.kind = "Rejection"
+  )
   sample.int(n, size, replace = FALSE)
 }
 
