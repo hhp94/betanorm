@@ -17,9 +17,9 @@ bmiq_calibration(
   tol = 0.001,
   beta.maxit = 50L,
   beta.score.tol = 1e-10,
-  h.policy = c("optional", "require"),
-  on.sample.error = c("stop", "continue"),
-  failed.sample = c("NA", "original"),
+  h.policy = "optional",
+  on.sample.error = "stop",
+  failed.sample = "NA",
   debug = FALSE,
   verbose = TRUE
 )
@@ -71,7 +71,7 @@ convergence is otherwise a valid choice.}
 \item{beta.score.tol}{Convergence tolerance for each Beta-component fit.}
 
 \item{h.policy}{What to do if intermediate (H) normalization fails when
-\code{doH = TRUE}.
+\code{doH = TRUE}. Exactly one of:
 \itemize{
 \item \code{"optional"} (default): keep the U-plus-upper-M calibration for that
 sample (lower-M observations, normally absorbed into the H map, are
@@ -79,15 +79,18 @@ left unchanged).
 \item \code{"require"}: treat the sample as failed.
 }}
 
-\item{on.sample.error}{What to do when a sample fails.
+\item{on.sample.error}{What to do when a sample fails. Exactly one of:
 \itemize{
 \item \code{"stop"} (default): abort.
 \item \code{"continue"}: record the failure and process remaining samples.
 }}
 
-\item{failed.sample}{For \code{on.sample.error = "continue"}, write either
-an all-\code{NA} row (\code{"NA"}, default) or keep the original betas
-(\code{"original"}).}
+\item{failed.sample}{What to write for a failed sample when
+\code{on.sample.error = "continue"}. Exactly one of:
+\itemize{
+\item \code{"NA"} (default): an all-\code{NA} row.
+\item \code{"original"}: keep the original betas.
+}}
 
 \item{debug}{If \code{TRUE}, attach detailed fit diagnostics to the result.}
 

@@ -819,17 +819,18 @@ bmiq_gold_fit <- function(
 #' @param beta.maxit Maximum iterations for each Beta-component fit.
 #' @param beta.score.tol Convergence tolerance for each Beta-component fit.
 #' @param h.policy What to do if intermediate (H) normalization fails when
-#'   `doH = TRUE`.
+#'   `doH = TRUE`. Exactly one of:
 #'   * `"optional"` (default): keep the U-plus-upper-M calibration for that
 #'     sample (lower-M observations, normally absorbed into the H map, are
 #'     left unchanged).
 #'   * `"require"`: treat the sample as failed.
-#' @param on.sample.error What to do when a sample fails.
+#' @param on.sample.error What to do when a sample fails. Exactly one of:
 #'   * `"stop"` (default): abort.
 #'   * `"continue"`: record the failure and process remaining samples.
-#' @param failed.sample For `on.sample.error = "continue"`, write either
-#'   an all-`NA` row (`"NA"`, default) or keep the original betas
-#'   (`"original"`).
+#' @param failed.sample What to write for a failed sample when
+#'   `on.sample.error = "continue"`. Exactly one of:
+#'   * `"NA"` (default): an all-`NA` row.
+#'   * `"original"`: keep the original betas.
 #' @param debug If `TRUE`, attach detailed fit diagnostics to the result.
 #' @param verbose If `TRUE`, print progress messages.
 #'
@@ -901,17 +902,17 @@ bmiq_calibration <- function(
   tol = 0.001,
   beta.maxit = 50L,
   beta.score.tol = 1e-10,
-  h.policy = c("optional", "require"),
-  on.sample.error = c("stop", "continue"),
-  failed.sample = c("NA", "original"),
+  h.policy = "optional",
+  on.sample.error = "stop",
+  failed.sample = "NA",
   debug = FALSE,
   verbose = TRUE
 ) {
   call <- match.call()
 
-  h.policy <- match.arg(h.policy)
-  on.sample.error <- match.arg(on.sample.error)
-  failed.sample <- match.arg(failed.sample)
+  checkmate::assert_choice(h.policy, c("optional", "require"))
+  checkmate::assert_choice(on.sample.error, c("stop", "continue"))
+  checkmate::assert_choice(failed.sample, c("NA", "original"))
 
   checkmate::assert_flag(debug)
   checkmate::assert_flag(verbose)
