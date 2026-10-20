@@ -337,7 +337,7 @@ estimate_mode <- function(x, context) {
   if (all(x == x[1L])) {
     return(x[1L])
   }
-  estimate <- density(x)
+  estimate <- stats::density(x)
   # density() is not boundary-corrected, so its Gaussian tails can place the
   # mode just outside the unit interval; clamp so it can only shift the
   # initialization thresholds toward, never past, a valid beta value.
@@ -582,8 +582,8 @@ em_diagnostics <- function(fit, extra = NULL) {
 }
 
 map_beta_q <- function(x, a.sample, b.sample, a.gold, b.gold, lower.tail) {
-  qbeta(
-    pbeta(x, a.sample, b.sample, lower.tail = lower.tail),
+  stats::qbeta(
+    stats::pbeta(x, a.sample, b.sample, lower.tail = lower.tail),
     a.gold,
     b.gold,
     lower.tail = lower.tail
@@ -1134,7 +1134,7 @@ bmiq_calibration <- function(
         class2.v <- sample.fit[["full_class"]]
 
         if (debug) {
-          diagnostic <- modifyList(
+          diagnostic <- utils::modifyList(
             diagnostic,
             em_diagnostics(sample.fit)
           )
