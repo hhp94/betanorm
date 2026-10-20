@@ -632,6 +632,58 @@ validate_em_settings <- function(
   list(nL = nL, nfit = nfit, niter = niter, beta.maxit = beta.maxit)
 }
 
+# Shape check of a prefitted gold passed to bmiq_calibration(). A fresh
+# bmiq_gold_fit() result already satisfies it; this owns the user-supplied
+# object (saved by another version, or edited), whose fields the sample path
+# reads unchecked.
+check_gold_fit <- function(gold, nL) {
+  checkmate::assert_int(
+    gold[["nL"]],
+    lower = 2L,
+    upper = 3L,
+    .var.name = 'goldstandard.beta[["nL"]]'
+  )
+  if (gold[["nL"]] != nL) {
+    stop(
+      "goldstandard.beta was fitted with nL = ",
+      gold[["nL"]],
+      " but this call requested nL = ",
+      nL,
+      ".",
+      call. = FALSE
+    )
+  }
+  for (shape in c("a", "b")) {
+    name <- paste0('goldstandard.beta[["', shape, '"]]')
+    checkmate::assert_numeric(
+      gold[[shape]],
+      finite = TRUE,
+      any.missing = FALSE,
+      len = nL,
+      .var.name = name
+    )
+    checkmate::assert_true(
+      all(gold[[shape]] > 0),
+      .var.name = paste0("all(", name, " > 0)")
+    )
+  }
+  check_thresholds(
+    gold[["thresholds"]],
+    nL = nL,
+    name = 'goldstandard.beta[["thresholds"]]',
+    require.unit.interval = TRUE
+  )
+  for (mode in c("unmethylated.mode", "methylated.mode")) {
+    checkmate::assert_number(
+      gold[[mode]],
+      lower = 0,
+      upper = 1,
+      .var.name = paste0('goldstandard.beta[["', mode, '"]]')
+    )
+  }
+  invisible(gold)
+}
+
 # Fit the gold-standard mixture and reduce it to the parameters the per-sample
 # calibration actually consumes. Settings are assumed validated by the caller.
 fit_gold_standard <- function(
@@ -1004,16 +1056,7 @@ bmiq_calibration <- function(
   # bmiq_gold_fit object can stand in for the raw vector and be reused across
   # calls (e.g. chunked calibration of one large matrix).
   if (inherits(goldstandard.beta, "bmiq_gold_fit")) {
-    if (goldstandard.beta[["nL"]] != nL) {
-      stop(
-        "goldstandard.beta was fitted with nL = ",
-        goldstandard.beta[["nL"]],
-        " but this call requested nL = ",
-        nL,
-        ".",
-        call. = FALSE
-      )
-    }
+    check_gold_fit(goldstandard.beta, nL = nL)
     gold <- goldstandard.beta
   } else {
     gold <- fit_gold_standard(

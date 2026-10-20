@@ -53,6 +53,42 @@ test_that("a prefit with a different nL is rejected", {
   )
 })
 
+test_that("a malformed prefit is refused before any sample runs", {
+  inputs <- make_calibration_inputs(n_probes = 1200L, nL = 3L, seed = 42L)
+  gold <- bmiq_gold_fit(inputs$gold, nL = 3L, nfit = 1200L, verbose = FALSE)
+  calibrate <- function(prefit) {
+    bmiq_calibration(
+      datM = inputs$datM,
+      goldstandard.beta = prefit,
+      nfit = 1200L,
+      on.sample.error = "continue",
+      verbose = FALSE
+    )
+  }
+  edit <- function(field, value) {
+    prefit <- gold
+    prefit[field] <- list(value)
+    prefit
+  }
+
+  expect_no_error(suppressWarnings(calibrate(gold)))
+  expect_error(calibrate(edit("nL", NULL)), regexp = "nL")
+  expect_error(calibrate(edit("a", gold$a[1:2])), regexp = '"a"')
+  expect_error(calibrate(edit("b", -gold$b)), regexp = '"b"')
+  expect_error(calibrate(edit("a", c(gold$a[1:2], NA))), regexp = '"a"')
+  expect_error(calibrate(edit("thresholds", NULL)), regexp = "thresholds")
+  expect_error(
+    calibrate(edit("thresholds", rev(gold$thresholds))),
+    regexp = "thresholds.*increasing"
+  )
+  expect_error(
+    calibrate(edit("thresholds", c(0, gold$thresholds[2L]))),
+    regexp = "thresholds.*inside"
+  )
+  expect_error(calibrate(edit("methylated.mode", NA_real_)), regexp = "mode")
+  expect_error(calibrate(edit("unmethylated.mode", 1.5)), regexp = "mode")
+})
+
 test_that("bmiq_gold_fit validates its inputs", {
   gold <- simulate_beta_mixture(600L, nL = 3L, seed = 3L)
 
