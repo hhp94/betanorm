@@ -224,6 +224,38 @@ After the Makevars went, the same held with R's default -O2 against 0.1.1
 built the same way, and 0.1.1 itself is identical at -O2 and -O3.
 Snapshots unchanged throughout.
 
+## 2026-10-20 — Code review, chunk 1: quantile_norm
+
+The first `/code-review` (`high`) of `R/quantile_norm.R` and
+`src/quantile_norm.cpp`; findings and dispositions in `dev/code-review.md`.
+Changed, with every 0.1.1 number kept (bitcheck 26/26, snapshots
+unchanged):
+
+- **`obj` finiteness has an owner.** The docs required it but nothing
+  checked it, so `Inf` was ranked and mapped to the ends of `target`. One
+  `checkmate::assert_numeric()` call now owns missing and finite for `obj`,
+  as one does for `target`; `assert_matrix()` owns the shape alone.
+- **One column maps every value to `min(target)`: documented, not
+  changed.** With `ncol(obj) == 1` a row has nothing to rank. Mapping to
+  the median, or refusing the input, would move numbers computed with
+  0.1.1.
+- Ties, the one-column case, dimnames and the input checks are pinned in
+  `test-quantile-norm.R`; the snapshots never reached them.
+
+Kept as they are (a later review that raises them needs new evidence):
+
+- **The two full transposes** (peak memory about 3x `obj`). A strided
+  gather and scatter would avoid them, but `quantile_norm()` is a one-shot
+  call on the user's matrix (nothing in the package calls it), and the gain
+  is unmeasured. Revisit if memory is shown to bind.
+- **The dead `fraction == 1.0` branch and the redundant `floor()`** in
+  `target_unequal_rank()`. Kept so the port still reads line by line
+  against preprocessCore.
+- **The absolute `4 * DBL_EPSILON` snap.** It mirrors preprocessCore. At
+  large `m` it stops snapping, and the interpolation it does instead is
+  off by about 1e-11 times the gap between neighbouring target values. A
+  relative tolerance would move numbers.
+
 ## Legacy compatibility (predates this log; do not drift)
 
 - `nL = 3`, `niter = 5` is the intentional legacy BMIQ configuration
