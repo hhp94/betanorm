@@ -33,6 +33,17 @@
   configuration but do not reproduce its numbers, and why; that a skipped
   H step leaves the H class unchanged as well as lower-M (the per-sample
   message says so too); and which settings a prefitted gold ignores.
+* `horvath_goldstandard` is a plain data frame. It was a readr tibble
+  carrying a column spec and a `problems` pointer that no longer worked
+  once loaded. The columns and values are unchanged.
+* The datasets' help pages give their sources: `horvath_goldstandard`
+  comes from the additional files of Horvath (2013), under CC BY 2.0, and
+  `GPL21145_sample` from NCBI GEO. `?GPL21145_sample` says that the 1062
+  probes the EPIC array does not measure are filled with 0, and shows how
+  to drop them.
+* The README no longer passes the removed `fit.policy` argument. It now
+  shows `bmiq_gold_fit()` and drops the zero-filled probes from its
+  example.
 * Results are bit-identical to 0.1.1 under R's default random-number
   generator. One numeric snapshot is redone, for the component status
   above only; its numbers are unchanged. Two warnings are reworded: they

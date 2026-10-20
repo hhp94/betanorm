@@ -53,8 +53,12 @@ are the evidence; a coverage gap found in a chunk gets a test there).
   The user took every proposal: fixed 1, 3, 8 and 9, documented 2, 4 and
   5, kept 6 and 7. No number moves in a default session. Outcome in
   DECISIONS.md (2026-10-20, chunk 3, and "Legacy compatibility").
-- [ ] 4. package glue (optional). Add `README.Rmd`/`README.md`: see the
-  chunk 3 side observation.
+- [x] 4. package glue: reviewed 2026-10-20 (`high`), 9 findings, with
+  `README.Rmd`/`README.md` added. The user took every proposal and named
+  NCBI GEO as the source of `GPL21145_sample`: all 9 fixed, the data
+  values unchanged. Outcome in DECISIONS.md (2026-10-20, chunk 4).
+
+The review is complete.
 
 ## Findings
 
@@ -329,3 +333,98 @@ from 0.1.1, from `1186b03`).
 - 6 and 7 **kept as they are**, with reasons in DECISIONS.md.
 - NEWS.md 0.1.2: a bullet each for 1, 3 and 9 and one for the docs. The
   bit-identity line now says "under R's default random-number generator".
+
+### Chunk 4: `R/betanorm-package.R`, `R/data.R`, `DESCRIPTION`, README
+
+`R/betanorm-package.R` and `DESCRIPTION` gave no findings: the
+`@importFrom Rcpp sourceCpp` line is the standard way to load Rcpp, and
+the vendored-file rules do not cover this file. No finding contradicts
+DECISIONS.md. Finding 6 is the README disagreeing with the `nL` roxygen,
+not with the log. The datasets were inspected from `data/*.rda`. Class in
+brackets, then the proposal.
+
+1. **1062 probes in the example matrix are zero-filled**
+   (`R/data.R:36`) [data; changing the data moves the bitcheck's
+   real-data numbers, not the package's]. `GPL21145_sample` is exactly 0
+   at the same 1062 probes in all 6 samples, and nowhere else (the
+   smallest other value is 0.0014). These are almost certainly the
+   probes of the 21k set that the EPIC array lacks, filled with 0. The
+   README demo and the bitcheck calibrate them as real, fully
+   unmethylated values, about 5% of each sample. Proposed: keep the data
+   as it is, since the bitcheck baselines and anything downstream rely
+   on it. Document the zeros in `data.R`, and show in the README how to
+   drop them before real use. **Needs the user to confirm the cause.**
+2. **`GPL21145_sample` has no documented source or terms**
+   (`R/data.R:31`) [provenance]. There is no `@source`. Its build script
+   reads `data-raw/server_matrix.csv`, which is not in the repo. Its
+   rownames name cohorts (CALERIE, BeCOME, CLHNS). And `inst/COPYRIGHTS`
+   covers it under "All other files: copyright Hung Pham". Proposed:
+   the user says where the six samples come from and under what terms.
+   Then add `@source`, a COPYRIGHTS entry, and the input's origin in the
+   data-raw script. If any cohort's data is controlled-access, the
+   samples should not ship; that is the user's decision. **Needs the
+   user.**
+3. **`horvath_goldstandard` is not attributed** (`R/data.R:1`)
+   [provenance]. It is the `probeAnnotation21kdatMethUsed.csv` table
+   from the Horvath (2013) additional files, which are CC BY 2.0, yet
+   COPYRIGHTS gives it to "All other files". The code taken from the
+   same paper's files is already attributed. Proposed: fix with a
+   `@source` and a COPYRIGHTS entry.
+4. **The README passes the removed `fit.policy`** (`README.Rmd:131`)
+   [bug in the docs]. The chunk is `eval = FALSE`, so knitting never
+   shows the problem. Copied, it fails with "unused argument". Line 89
+   also tells users to "tighten `fit.policy`". Proposed: fix by removing
+   both.
+5. **The README says the defaults reproduce legacy numbers**
+   (`README.Rmd:82`) [docs]. This contradicts the chunk 3 record.
+   Proposed: fix with the same wording as the roxygen: legacy
+   configuration, not legacy numbers.
+6. **The README pushes `nL = 2` as the way to run EM longer**
+   (`README.Rmd:87`, also line 105) [docs]. The `nL` roxygen says the
+   opposite: `nL` is a modeling choice, and either model can be run
+   further by raising `niter`. Proposed: fix by rewriting both passages
+   to match the roxygen.
+7. **The README credits RcppArmadillo** (`README.Rmd:23`) [docs]. The
+   package links Rcpp only. Proposed: fix.
+8. **The README leaves out `bmiq_gold_fit()`** (`README.Rmd:137`) [docs].
+   It is exported, and DECISIONS.md makes it the basis for reuse and for
+   process-level parallelism. Proposed: fix by adding it to the table,
+   with a short prefit example (fit once, calibrate chunks).
+9. **`horvath_goldstandard` ships as a readr tibble** (`R/data.R:6`)
+   [data; no number moves]. The object is a `spec_tbl_df`. It carries
+   readr's `spec` attribute and a `problems` external pointer that is
+   null after loading, so `readr::problems()` fails on it. The docs say
+   it is a data frame and that `Gene_ID` "may be missing", but no value
+   is missing, and they do not say the coordinates are NCBI build 36.
+   Proposed: fix. Store a plain `data.frame` with the same columns and
+   values (`as.data.frame()` in the data-raw script, then re-save), and
+   correct the two doc lines. The bitcheck reads only `goldstandard2`,
+   so it should come out identical.
+
+Dispositions (the user took every proposal; for 2 they said the samples
+come from NCBI GEO and a link is enough). Docs commits passed
+`devtools::document()` and the suite (264); the data commit also passed
+the bitcheck, values as after chunk 2.
+
+- 3 **fixed** (`6ae3576`): `@source` for `horvath_goldstandard`. The
+  COPYRIGHTS catch-all now excepts "the example datasets, whose help
+  pages give their sources" instead of naming `data/` paths, because the
+  downstream copies COPYRIGHTS and may not ship the data.
+- 2 **fixed** (`a075df8`): `@source` links the GEO platform page for
+  GPL21145, and the data-raw script says where `server_matrix.csv` came
+  from.
+- 1 **fixed by documenting** (`9463e90`). The cause is confirmed: none of
+  the 1062 zero probes is in the EPIC annotation
+  (`IlluminaHumanMethylationEPICanno.ilm10b4.hg19`), and all of the other
+  20306 are. The data is unchanged; the example shows how to drop them.
+- 9 **fixed** (`144eb2f`): the data-raw script wraps `read_csv()` in
+  `as.data.frame()`, and the re-saved `.rda` (xz, version 3) has every
+  column identical to the old object. The two doc lines are corrected.
+  The bitcheck's real-data cases are identical.
+- 4 to 8 **fixed** in one commit (`a43ab83`), since `README.md` is
+  rendered as a whole. There is no pandoc on this machine, so
+  `README.md` was synced by hand, and every output in it comes from
+  knitting `README.Rmd` against the installed package. The README demo
+  now drops the zero-filled probes, and its new prefit example checks
+  that a chunked calibration is identical to the full one (`TRUE`).
+  Re-render with `devtools::build_readme()` where pandoc is available.

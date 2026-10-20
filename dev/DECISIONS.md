@@ -357,6 +357,32 @@ Kept as they are:
   vector in memory; only `saveRDS()` repeats it per sample. Moving it
   would change the diagnostics shape for a debug-only cost.
 
+## 2026-10-20 — Code review, chunk 4: package glue, data, README
+
+The last chunk of the review (`high`): `R/betanorm-package.R`,
+`R/data.R`, `DESCRIPTION`, and the README. Findings and dispositions are
+in `dev/code-review.md`. All nine fixed; no package number moved, and no
+data value changed.
+
+- **The datasets credit their sources.** `horvath_goldstandard` is
+  Horvath (2013)'s `probeAnnotation21kdatMethUsed.csv` (CC BY 2.0), and
+  `GPL21145_sample` comes from NCBI GEO, platform GPL21145 (the user's
+  account; a link is enough). Both are in the help pages' `@source`. The
+  COPYRIGHTS catch-all excepts "the example datasets" without naming
+  `data/` paths, because the downstream copies COPYRIGHTS.
+- **`GPL21145_sample` keeps its 1062 zero-filled probes.** They are the
+  gold-standard probes the EPIC array does not measure: none is in the
+  EPIC annotation, and every other probe is. Removing them would move
+  the bitcheck's real-data baselines, so the data stays as it is. The
+  help page and the README say so and drop them before calibrating.
+- **`horvath_goldstandard` is a plain data frame.** It was a readr
+  `spec_tbl_df` with a `problems` pointer that is dead once loaded. Every
+  column is identical, and so are the bitcheck's real-data cases.
+- **`README.md` is synced by hand** until pandoc is available here. Its
+  outputs come from knitting `README.Rmd`. It no longer passes the
+  removed `fit.policy`, and it no longer claims legacy numbers or
+  presents `nL = 2` as the way to run EM longer.
+
 ## Legacy compatibility (predates this log; do not drift)
 
 - `nL = 3`, `niter = 5` is the intentional legacy BMIQ configuration

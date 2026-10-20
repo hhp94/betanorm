@@ -3,15 +3,6 @@
 Work in flight. One section per thread; delete a section when it lands
 (its outcome goes to DECISIONS.md).
 
-## Code review in chunks (branch: boost-investigate)
-
-Started 2026-10-20 at `dce688a` (0.1.2). First `/code-review` of the
-package, one chunk at a time: quantile_norm, `src/bmiq_norm.cpp`,
-`R/bmiq_calibration.R`, then optional package glue. Plan, per-chunk
-process, status and findings: `dev/code-review.md`. Fixes go through
-the 0.1.2 bit-identity gate; a finding that contradicts DECISIONS.md is
-adjudicated and the log updated.
-
 ## One up-front scan of the input matrix (not started)
 
 Raised 2026-10-20 during chunk 2. **Goal:** every value check and
