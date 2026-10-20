@@ -17,7 +17,6 @@ inst/doc
 !/dev/**/
 !/dev/DECISIONS.md
 !/dev/to-do.md
-!/dev/code-review.md
 !/dev/bitcheck-0.1.2.R
 !/dev/bmiq-calibration-legacy.R
 !/dev/MEAT_1.24.0/MEAT/DESCRIPTION

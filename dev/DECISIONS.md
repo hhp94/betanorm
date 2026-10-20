@@ -391,7 +391,7 @@ A file is opted in only when CLAUDE.md, this log, `dev/to-do.md` or
 `inst/COPYRIGHTS` cites it, or the gate runs it. Scratch work in `dev/`
 stays out of git by default. Tracked:
 
-- records: `DECISIONS.md`, `to-do.md`, `code-review.md`;
+- records: `DECISIONS.md`, `to-do.md`;
 - the gate: `bitcheck-0.1.2.R`;
 - reference copies (COPYRIGHTS, "Legacy compatibility"):
   `bmiq-calibration-legacy.R`; MEAT 1.24.0 cut to its calibration
@@ -413,6 +413,11 @@ DESCRIPTION and the help pages already cite; and
 `slideimp_description.txt`. Older entries and `code-review.md` still cite
 some of them. Each is in git history, for example
 `git show 7110321:dev/with_nl2/bmiq-calibration.R`.
+
+`code-review.md` is the exception to the rule: the chunk entries above
+cite it, but it is kept locally, untracked (user, 2026-10-20). Those
+entries hold the outcomes; the full log is in git history, as
+`git show ae2f1ba:dev/code-review.md`.
 
 ## 2026-09-25 — GPL (>= 3), with the upstream authors as `cph` (0.1.0)
 
