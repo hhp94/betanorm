@@ -256,6 +256,64 @@ Kept as they are (a later review that raises them needs new evidence):
   off by about 1e-11 times the gap between neighbouring target values. A
   relative tolerance would move numbers.
 
+## 2026-10-20 — Code review, chunk 2: bmiq_norm.cpp
+
+The `/code-review` (`high`) of `src/bmiq_norm.cpp`; findings and
+dispositions in `dev/code-review.md`. None of the 2026-10-05 hardening is
+reopened.
+
+Changed, no number moved:
+
+- **A retained component keeps its real fit status.** When the ascent
+  guard keeps a component's previous shapes, `fit_status` was set to
+  "converged" whatever that fit had ended as; it now stays the status of
+  the fit the shapes came from. The nL = 2 EM snapshot takes this path at
+  its last iteration ("max_iter" twice, was "converged"), so that one
+  snapshot was redone. Against 0.1.1, every other field of that case and
+  every other bitcheck case are bitwise identical.
+
+Adjudicated against "Validation: one owner per invariant" (2026-08-10):
+
+- **The kernel's `nL` in {2, 3} check stays.** It duplicates R's
+  `checkmate::assert_int(nL, lower = 2L, upper = 3L)`, and K = 4 would be
+  memory-safe (the responsibility shape check is the bounds guard). But no
+  R code downstream of the kernel handles more than three components, and
+  `test-cpp-contract.R` pins the check as the kernel's own contract. It is
+  an exception to the rule, now listed in CLAUDE.md beside the other
+  deliberate C++ checks.
+
+Known and accepted:
+
+- **`log_beta_norm()` uses `std::lgamma`, from the platform libm**, while
+  digamma and trigamma come from Rmath. On this machine (mingw, gcc 14.2)
+  `std::lgamma` differs from R's `lgamma` at 58% of 200k points in
+  (0.001, 100), by up to 2.8e-14 (2e-11 relative near its zeros at 1 and
+  2), so another libm gives slightly different EM numbers. Whether they stay
+  inside the 1e-12 snapshots is unmeasured (no CI on another platform).
+  Moving to `R::lgammafn` or `R::lbeta` would make the EM portable but is a
+  deliberate numerics change, like the single-exp E-step, and would break
+  results computed with 0.1.1. The cancellation in the three-term form does
+  not matter at real shapes (1.5 to 38 in the bitcheck cases: about 6e-14
+  from `lbeta`). If EM threading is ever tried: glibc's `lgamma` writes the
+  global `signgam`, so it is not thread-safe.
+
+Kept as they are:
+
+- **The non-finite-concentration fallback to 1.0** in
+  `fit_beta_from_stats()`. Reachable only with a subnormal weighted
+  variance; a zero variance is refused one check earlier.
+- **The Welford update's division per observation.** Plain weighted sums
+  would change the arithmetic, and the EM is about 26% of runtime (the -O2
+  profile); the quantile map is where the time goes.
+- **The redundant `!std::isfinite(p)`.** Bit-identical either way; not
+  worth churn in a vendored file.
+
+Observed, not acted on: the Newton fit often stops at `beta_maxit = 50`
+("max_iter") rather than at the 1e-10 scaled-score tolerance (14 of 38 EM
+iterations in the nL = 2 snapshot case, for one component or both), with
+every step still accepted, i.e. at the noise floor. The cost is per
+component, not per observation.
+
 ## Legacy compatibility (predates this log; do not drift)
 
 - `nL = 3`, `niter = 5` is the intentional legacy BMIQ configuration

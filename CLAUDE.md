@@ -27,8 +27,9 @@ those there without new evidence. Work in flight is tracked in
 - **Validation lives in R; C++ trusts its caller.** Each invariant has one
   owner (DECISIONS.md). The C++ that does check input is deliberate:
   `scan_finite_unit_interval_cpp` is R's single-pass finite/[0, 1] scan,
-  `beta_mixture_em_cpp` owns its strict-interior (0, 1) precondition on `y`,
-  and the kernels' bounds guards are memory safety, not validation.
+  `beta_mixture_em_cpp` owns its strict-interior (0, 1) precondition on `y`
+  and its `nL` in {2, 3} check (pinned by `test-cpp-contract.R`), and the
+  kernels' bounds guards are memory safety, not validation.
 - **The gold standard is consumed purely distributionally** (shapes,
   thresholds, class modes). Nothing may index it per-probe or assume
   alignment with `ncol(datM)`.
