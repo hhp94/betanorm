@@ -7,7 +7,10 @@
 \format{
 A numeric matrix with 6 samples (rows) and 21368 CpGs (columns).
 Column names match \code{horvath_goldstandard[["Name"]]}. Values are in
-\eqn{[0, 1]}.
+\eqn{[0, 1]}. The 1062 probes of \link{horvath_goldstandard} that the EPIC
+array does not measure are filled with 0 in every sample. They are not
+measurements, so drop them before calibrating (see the examples); the
+gold vector need not match the columns.
 }
 \source{
 NCBI GEO, platform GPL21145 (Illumina MethylationEPIC):
@@ -23,6 +26,11 @@ Example DNA methylation beta matrix for probes in
 \examples{
 data(GPL21145_sample)
 dim(GPL21145_sample)
+
+# Probes the EPIC array does not measure are 0 in every sample.
+measured <- colSums(GPL21145_sample == 0) < nrow(GPL21145_sample)
+sum(!measured)
+dim(GPL21145_sample[, measured])
 
 }
 \keyword{datasets}
