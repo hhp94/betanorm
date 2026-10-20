@@ -52,8 +52,8 @@ dim(Y)
 
 For methylation betas, `bmiq_calibration()` fits a two- or
 three-component beta mixture per sample and maps components toward a
-gold-standard profile. Use this when you need that procedure
-(for example, clock-style workflows); prefer `quantile_norm()` when a plain
+gold-standard profile. Use this when you need that procedure (for
+example, clock-style workflows); prefer `quantile_norm()` when a plain
 target distribution is enough.
 
 Built-in example data: gold-standard annotation and a small EPIC beta
@@ -176,8 +176,8 @@ fit <- bmiq_calibration(
 betanorm is licensed under GPL (\>= 3) because parts of it are derived
 from GPL-family code. Its quantile normalization is derived from
 preprocessCore (LGPL \>= 2), and its BMIQ calibration and beta-mixture
-EM are derived from Steve Horvath's BMIQcalibration, which builds on
-Andrew Teschendorff's BMIQ and on the RPMM package (GPL \>= 2). The
+EM are derived from Steve Horvath’s BMIQcalibration, which builds on
+Andrew Teschendorff’s BMIQ and on the RPMM package (GPL \>= 2). The
 original authors are credited as copyright holders in `DESCRIPTION`, and
 `inst/COPYRIGHTS` records which file derives from which source.
 

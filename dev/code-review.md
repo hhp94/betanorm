@@ -427,4 +427,5 @@ the bitcheck, values as after chunk 2.
   knitting `README.Rmd` against the installed package. The README demo
   now drops the zero-filled probes, and its new prefit example checks
   that a chunked calibration is identical to the full one (`TRUE`).
-  Re-render with `devtools::build_readme()` where pandoc is available.
+  A pandoc render afterwards changed only one line wrap and two
+  apostrophes.

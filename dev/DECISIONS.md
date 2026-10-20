@@ -378,8 +378,9 @@ data value changed.
 - **`horvath_goldstandard` is a plain data frame.** It was a readr
   `spec_tbl_df` with a `problems` pointer that is dead once loaded. Every
   column is identical, and so are the bitcheck's real-data cases.
-- **`README.md` is synced by hand** until pandoc is available here. Its
-  outputs come from knitting `README.Rmd`. It no longer passes the
+- **`README.md` was first synced by hand**, as there is no pandoc here,
+  with outputs from knitting `README.Rmd`. A pandoc render afterwards
+  changed only one line wrap and two apostrophes. It no longer passes the
   removed `fit.policy`, and it no longer claims legacy numbers or
   presents `nL = 2` as the way to run EM longer.
 
