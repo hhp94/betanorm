@@ -645,7 +645,8 @@ Rcpp::List beta_mixture_em_cpp(
                 {
                     a[k] = prev_a[k];
                     b[k] = prev_b[k];
-                    fit_status[k] = "converged";
+                    // fit_status[k] still holds the status of the fit that
+                    // produced the kept shapes, so it stays as it is.
                     fit_reason[k] =
                         "retained previous shapes; M-step candidate did not "
                         "improve the weighted log-likelihood";

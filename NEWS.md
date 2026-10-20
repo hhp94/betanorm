@@ -13,9 +13,14 @@
 * `quantile_norm()` refuses an `obj` holding `Inf` or `-Inf`, as its
   documentation already required. Before, they were ranked like any other
   value and mapped to the ends of `target`.
-* Results are bit-identical to 0.1.1 and the numeric snapshots are
-  unchanged. Two warnings are reworded: they now point to
-  `result[["failures"]]` and `result[["h.applied"]]`.
+* When the mixture EM keeps a component's previous shapes because the new
+  fit did not improve the likelihood, the component status in the
+  `debug = TRUE` diagnostics is now that of the fit the shapes came from
+  (for example `"max_iter"`). Before, it always said `"converged"`.
+* Results are bit-identical to 0.1.1. One numeric snapshot is redone, for
+  the component status above only; its numbers are unchanged. Two warnings
+  are reworded: they now point to `result[["failures"]]` and
+  `result[["h.applied"]]`.
 
 # betanorm 0.1.1
 

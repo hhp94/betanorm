@@ -56,3 +56,30 @@ test_that("EM convergence requires both parameter and relative loglik criteria",
     )
   }
 })
+
+test_that("a component that keeps its previous shapes keeps their status", {
+  # The nL = 2 snapshot case: at its last iteration the ascent guard keeps
+  # both components' previous shapes. Rerunning one iteration short gives
+  # the fit those shapes came from.
+  y <- simulate_beta_mixture(2000L, nL = 2L, seed = 4321L)
+  w0 <- hard_responsibility(y, 0.5, 2L)
+  run <- function(maxiter) {
+    beta_mixture_em_cpp(
+      y = y,
+      initial_responsibility = w0,
+      nL = 2L,
+      maxiter = maxiter,
+      tol = 1e-8
+    )
+  }
+
+  fit <- run(40L)
+  previous <- run(fit$iterations - 1L)
+
+  expect_true(all(startsWith(fit$fit_reason, "retained previous shapes")))
+  expect_identical(fit$a, previous$a)
+  expect_identical(fit$b, previous$b)
+  # The status is that of the fit that produced the shapes, not a blanket
+  # "converged".
+  expect_identical(fit$fit_status, previous$fit_status)
+})
