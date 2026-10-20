@@ -1032,29 +1032,10 @@ bmiq_calibration <- function(
     sample.names <- rep.int("", number.of.samples)
   }
 
-  # Freshly allocated output so the C++ block scatter can mutate it in place
-  # without ever touching the caller's datM (copy-on-write would otherwise make
-  # the first write allocate a full-size copy anyway).
-  calibrated <- matrix(
-    NA_real_,
-    nrow = number.of.samples,
-    ncol = number.of.probes,
-    dimnames = dimnames(datM)
-  )
-
-  success <- rep.int(FALSE, number.of.samples)
-  h.applied.vec <- rep(NA, number.of.samples)
-  failures <- list()
-
-  sample.diagnostics <- if (debug) {
-    vector("list", number.of.samples)
-  } else {
-    NULL
-  }
-
   # The gold standard is consumed purely distributionally, so a prefitted
   # bmiq_gold_fit object can stand in for the raw vector and be reused across
-  # calls (e.g. chunked calibration of one large matrix).
+  # calls (e.g. chunked calibration of one large matrix). It comes before the
+  # output allocation, so a bad gold fails before a full-size matrix exists.
   if (inherits(goldstandard.beta, "bmiq_gold_fit")) {
     check_gold_fit(goldstandard.beta, nL = nL)
     gold <- goldstandard.beta
@@ -1079,6 +1060,26 @@ bmiq_calibration <- function(
   mod1U <- gold[["unmethylated.mode"]]
   mod1M <- gold[["methylated.mode"]]
   gold.diagnostics <- if (debug) gold[["diagnostics"]] else NULL
+
+  # Freshly allocated output so the C++ block scatter can mutate it in place
+  # without ever touching the caller's datM (copy-on-write would otherwise make
+  # the first write allocate a full-size copy anyway).
+  calibrated <- matrix(
+    NA_real_,
+    nrow = number.of.samples,
+    ncol = number.of.probes,
+    dimnames = dimnames(datM)
+  )
+
+  success <- rep.int(FALSE, number.of.samples)
+  h.applied.vec <- rep(NA, number.of.samples)
+  failures <- list()
+
+  sample.diagnostics <- if (debug) {
+    vector("list", number.of.samples)
+  } else {
+    NULL
+  }
 
   # The fit subset is identical for every sample (same probe count, nfit, and
   # seed), so draw it once for the whole loop.
