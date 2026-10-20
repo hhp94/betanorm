@@ -18,6 +18,10 @@
 #' data(horvath_goldstandard)
 #' head(horvath_goldstandard)
 #'
+#' @source `probeAnnotation21kdatMethUsed.csv`, published with the R tutorial
+#'   in the additional files of Horvath (2013) under CC BY 2.0
+#'   (\doi{10.1186/gb-2013-14-10-r115}). The values are unchanged.
+#'
 #' @references
 #' Horvath S (2013).
 #' DNA methylation age of human tissues and cell types.

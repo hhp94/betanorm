@@ -16,6 +16,11 @@ A data frame with 21368 rows and 7 variables:
 \item{\code{goldstandard2}}{Gold-standard mean beta value.}
 }
 }
+\source{
+\code{probeAnnotation21kdatMethUsed.csv}, published with the R tutorial
+in the additional files of Horvath (2013) under CC BY 2.0
+(\doi{10.1186/gb-2013-14-10-r115}). The values are unchanged.
+}
 \usage{
 horvath_goldstandard
 }

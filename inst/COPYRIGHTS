@@ -32,4 +32,5 @@ Reference copies
   dev/bmiq-calibration-legacy.R (Horvath's BMIQcalibration, blc2 and
   betaEst2) for the BMIQ calibration and the beta-mixture EM.
 
-All other files: copyright Hung Pham, GPL (>= 3).
+All other files: copyright Hung Pham, GPL (>= 3), except the example
+datasets, whose help pages give their sources.
