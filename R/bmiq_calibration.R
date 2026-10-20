@@ -1293,13 +1293,10 @@ bmiq_calibration <- function(
                 )
               }
 
-              selH.idx <- unique(c(which(class2.v == 2L), selML.idx))
-              if (!length(selH.idx)) {
-                stop(
-                  "Intermediate/H normalization set is empty.",
-                  call. = FALSE
-                )
-              }
+              # Class 2 and lower-M (class 3) are disjoint, and
+              # require_all_classes() already guarantees class 2 is not
+              # empty, so the H set is never empty.
+              selH.idx <- c(which(class2.v == 2L), selML.idx)
 
               minH <- min(beta2.v[selH.idx])
               maxH <- max(beta2.v[selH.idx])
