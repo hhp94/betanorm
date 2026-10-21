@@ -1,6 +1,10 @@
-## Builds FIXED_QTABLE, the gold quantile table bmiq_calibration_fixed()
-## reads, into R/sysdata.rda, which holds nothing else. Run from the package
-## root after data-raw/bmiq_gold_fixed.R. Rationale: dev/DECISIONS.md.
+## Builds the gold quantile tables bmiq_calibration_fixed() reads: one file
+## per gold set, data-raw/fixed_qtable_<gold>.rds, then FIXED_QTABLE in
+## R/sysdata.rda (which holds nothing else), the named list of those files.
+## Run from the package root after data-raw/bmiq_gold_fixed.R. A file is
+## written only when it is missing or holds another value, so adding a gold
+## set leaves the files of the others byte for byte. Rationale:
+## dev/DECISIONS.md.
 devtools::load_all(".", quiet = TRUE)
 
 QTABLE_N <- 8192L
@@ -59,18 +63,47 @@ make_component <- function(a, b) {
 }
 
 # The U and M components of each gold set; H is never quantile-mapped.
-FIXED_QTABLE <- lapply(FIXED_GOLD, function(shapes) {
+tables <- lapply(FIXED_GOLD, function(shapes) {
   list(
     U = make_component(shapes[["a"]][1L], shapes[["b"]][1L]),
     M = make_component(shapes[["a"]][3L], shapes[["b"]][3L])
   )
 })
 
-save(FIXED_QTABLE, file = file.path("R", "sysdata.rda"), compress = "xz")
+qtable_path <- function(gold) {
+  file.path("data-raw", paste0("fixed_qtable_", gold, ".rds"))
+}
+
+for (gold in names(tables)) {
+  path <- qtable_path(gold)
+  if (!file.exists(path) || !identical(readRDS(path), tables[[gold]])) {
+    saveRDS(tables[[gold]], path, compress = "xz")
+  }
+}
+
+# FIXED_QTABLE is read back from the files, so it holds what they hold.
+FIXED_QTABLE <- lapply(
+  stats::setNames(nm = names(tables)),
+  function(gold) readRDS(qtable_path(gold))
+)
+stopifnot(identical(FIXED_QTABLE, tables))
+
+# The same rule for R/sysdata.rda: rewritten only when its table changes.
+sysdata <- file.path("R", "sysdata.rda")
+stored <- new.env()
+if (file.exists(sysdata)) {
+  load(sysdata, envir = stored)
+}
+if (
+  !identical(ls(stored), "FIXED_QTABLE") ||
+    !identical(stored[["FIXED_QTABLE"]], FIXED_QTABLE)
+) {
+  save(FIXED_QTABLE, file = sysdata, compress = "xz")
+}
 
 # Round trip: the saved table must load back to the same bits.
 loaded <- new.env()
-load(file.path("R", "sysdata.rda"), envir = loaded)
+load(sysdata, envir = loaded)
 stopifnot(
   identical(ls(loaded), "FIXED_QTABLE"),
   identical(loaded[["FIXED_QTABLE"]], FIXED_QTABLE)

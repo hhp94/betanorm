@@ -184,6 +184,10 @@ its front door and stay there.
 
 ## 2026-10-20 — The vendored files follow the downstream code rules (0.1.2)
 
+Amended 2026-10-21 by the "used as they are" entry below (0.1.5): the
+downstream now copies a different set of files, byte for byte, and strips
+nothing. The rules below stand.
+
 A downstream package vendors `R/bmiq_calibration.R`, `R/quantile_norm.R`,
 `src/bmiq_norm.cpp`, `src/quantile_norm.cpp` and `inst/COPYRIGHTS`, and its
 copy script strips roxygen lines and nothing else. Its code rules are
@@ -612,6 +616,11 @@ untracked; this entry is its outcome.
 
 ## 2026-10-20 — The gold quantile table ships in `R/sysdata.rda` (0.1.3)
 
+Amended 2026-10-21 by the "used as they are" entry below (0.1.5): each
+gold's table is also a file of its own, `data-raw/fixed_qtable_<gold>.rds`,
+which is what the downstream copies, and `R/sysdata.rda` is built from
+those files. The rest stands.
+
 The table is built once, ahead of time, by `data-raw/bmiq_gold_qtable.R`
 and stored as `FIXED_QTABLE` in `R/sysdata.rda`: one entry per gold set
 in `FIXED_GOLD`, components `U` and `M`, each two half-tables with their
@@ -676,6 +685,10 @@ went with the argument. To regenerate: `data-raw/bmiq_gold_fixed.R`
 (paste its output), then `data-raw/bmiq_gold_qtable.R`.
 
 ## 2026-10-20 — `bmiq_calibration_fixed()` is internal, quiet, and plainly commented (0.1.3)
+
+Amended 2026-10-21 by the "used as they are" entry below (0.1.5): the
+`@keywords internal` and `@noRd` block is now plain comments, so the file
+has no roxygen. The function is still not exported. The rest stands.
 
 The downstream copies the file word for word, so any change it would
 want is a commit here. The file therefore carries as little as it can
@@ -1061,6 +1074,71 @@ What moved:
 
 The downstream takes `src/bmiq_norm.cpp` with the fixed file at its next
 pin.
+
+## 2026-10-21 — The copied files are used as they are; one table file per gold (0.1.5)
+
+The downstream, a GPL (>= 3) package, fetches its files from GitHub at a
+pinned commit and copies them byte for byte, with no edit and nothing
+stripped: `R/bmiq_calibration_fixed.R`, `R/quantile_norm_fixed.R`,
+`src/bmiq_norm.cpp`, `src/quantile_norm.cpp` and
+`data-raw/fixed_qtable_horvath.rds`. It regenerates the `RcppExports`
+files itself and has its own `inst/COPYRIGHTS`. Whatever it needs changed
+is changed here (user, 2026-10-21). This replaces the roxygen stripping
+of the vendored-files entry, the copy of `FIXED_QTABLE` out of
+`R/sysdata.rda` in the stored-table entry, and the roxygen block of the
+"internal, quiet" entry.
+
+- **No roxygen in a copied file.** The fixed file's `@noRd` block is now
+  plain `#` comments that say the same, not exported and no help page.
+  The `.cpp` files never had `//'` lines. `NAMESPACE` and `man/` are
+  unchanged.
+- **Every comment stays true inside another package.** A comment that
+  names a betanorm file, function or object the copy does not carry says
+  "betanorm's". In the fixed file that is `bmiq_calibration()`,
+  `bmiq_gold_fit()`, `horvath_goldstandard`, `data-raw/bmiq_gold_fixed.R`,
+  `R/sysdata.rda` and `data-raw/bmiq_gold_qtable.R`. In `bmiq_norm.cpp` it
+  is `bmiq_calibration()`, `dev/DECISIONS.md` and the snapshots. In
+  `quantile_norm.cpp` it is `quantile_norm()`, now named beside
+  `quantile_norm_fixed()`. The "see inst/COPYRIGHTS" header lines stay,
+  since the downstream has its own.
+- **`quantile_norm_fixed()` is a clone, not a wrapper.** The first plan
+  was for `quantile_norm()` to call it, so that there is one body.
+  Measured: the condition messages stay the same, but checkmate reports
+  the frame that called the assertion (`sys.call(-2)`), so every refusal
+  would read `Error in quantile_norm_fixed(obj, target)` in place of the
+  user's own call. Binding `quantile_norm <- quantile_norm_fixed` keeps
+  the call, but `quantile_norm.R` collates before `quantile_norm_fixed.R`
+  in the C locale, so it needs a `Collate` field (`@include`) for the
+  whole package. Taken instead: the same code in both files, with
+  `test-quantile-norm.R` pinning `identical(quantile_norm_fixed,
+  quantile_norm)`. On closures that compares formals, body and
+  environment, and ignores srcrefs, bytecode and layout, so an edit to
+  one without the other fails it. This follows the fixed calibration,
+  which also stands alone, pinned to the general function.
+  `quantile_norm()` is untouched.
+- **One table file per gold.** `data-raw/bmiq_gold_qtable.R` builds each
+  gold's table as before and writes it to `data-raw/fixed_qtable_<gold>.rds`
+  (`saveRDS(compress = "xz")`), but only when the file is missing or
+  `readRDS()` gives another value. It then reads the files back into
+  `FIXED_QTABLE`, the same named list, and saves `R/sysdata.rda` under the
+  same rule. So adding a gold leaves the other files byte for byte.
+  Checked on a scratch copy with a second gold: the Horvath file kept its
+  sha256, and the new file and a two-entry `R/sysdata.rda` were written.
+  The downstream builds its own `FIXED_QTABLE` from the `.rds`.
+  `data-raw/` stays build-ignored and nothing installed reads the files.
+  `test-bmiq-fixed.R` checks that the files present are one per
+  `names(FIXED_QTABLE)` and that each is `identical()` to its entry. It is
+  skipped without `data-raw/`, as under R CMD check.
+
+Numbers: the rebuild here (R 4.6.1) gives a table `identical()` to the one
+at `13f2ece` (built under R 4.6.0), so `R/sysdata.rda` was not rewritten
+and its bytes are those of `13f2ece`. `data-raw/fixed_qtable_horvath.rds`
+(1.08 MB, another blob in history) is `identical()` to
+`FIXED_QTABLE[["horvath"]]`. No code path changed, and the snapshots pass
+unchanged.
+
+Known: a gold removed from `FIXED_GOLD` leaves its file behind. The
+script does not delete it, and the test fails until it is removed.
 
 ## 2026-09-25 — GPL (>= 3), with the upstream authors as `cph` (0.1.0)
 

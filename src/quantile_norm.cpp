@@ -20,9 +20,10 @@ namespace
         // A total order with NaN last. A bare `value < other.value` makes NaN
         // equivalent to everything, which is not a strict weak ordering and
         // violates std::sort's precondition (UB: measured to silently drop the
-        // NaN and return plausible wrong numbers). quantile_norm() rejects NaN
-        // before this point; this keeps the kernel defined if that ever moves.
-        // For NaN-free input every comparison is unchanged, so the sort is too.
+        // NaN and return plausible wrong numbers). quantile_norm_fixed() and
+        // betanorm's quantile_norm() reject NaN before this point; this keeps
+        // the kernel defined if that ever moves. For NaN-free input every
+        // comparison is unchanged, so the sort is too.
         bool operator<(const DataItem &other) const
         {
             if (std::isnan(value))

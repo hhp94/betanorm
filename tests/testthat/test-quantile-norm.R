@@ -1,6 +1,14 @@
 # quantile_norm(): what it refuses, and the cases the snapshots in
 # test-numeric-regression.R do not reach.
 
+test_that("quantile_norm_fixed() is quantile_norm()", {
+  # The copied file holds the same function under another name: same
+  # formals, same body and the same namespace (identical() sets srcrefs and
+  # bytecode aside). A clone, not a wrapper: a wrapper would name
+  # quantile_norm_fixed() as the call in quantile_norm()'s errors.
+  expect_true(identical(quantile_norm_fixed, quantile_norm))
+})
+
 test_that("obj must be finite", {
   target <- c(0.2, 0.4, 0.6, 0.8)
   obj <- matrix(c(0.5, 0.1, 0.9, 0.3), nrow = 1L)

@@ -2,7 +2,7 @@ betanorm is licensed under GPL (>= 3). Parts of it were written with other
 packages' source code open as the reference, and are derived from that code.
 The derived files and their origins are listed below.
 
-R/quantile_norm.R, src/quantile_norm.cpp
+R/quantile_norm.R, R/quantile_norm_fixed.R, src/quantile_norm.cpp
   Derived from preprocessCore (normalize.quantiles.use.target, get_ranks),
   copyright Ben Bolstad, LGPL (>= 2). Ported to a no-missing-data, row-wise
   form in C++. LGPL (>= 2) permits distribution under GPL (>= 3).
@@ -28,9 +28,12 @@ modes and quantile transformation)
   wateRmelon, which GPL (>= 3) covers.
 
 FIXED_GOLD in R/bmiq_calibration_fixed.R, FIXED_QTABLE in R/sysdata.rda
+and the per-gold files it is built from, data-raw/fixed_qtable_<gold>.rds
   Computed from the goldstandard2 column of horvath_goldstandard, from
   Horvath S (2013), Genome Biology 14:R115, doi:10.1186/gb-2013-14-10-r115,
-  under CC BY 2.0: its fitted beta mixture and that fit's quantile table.
+  under CC BY 2.0: its fitted beta mixture and that fit's quantile table
+  (data-raw/fixed_qtable_horvath.rds, in the development repository, not
+  the built package).
 
 Reference copies
   The source consulted during development is kept in the development

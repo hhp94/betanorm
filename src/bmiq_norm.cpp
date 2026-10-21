@@ -384,10 +384,10 @@ Rcpp::NumericMatrix gather_sample_block_cpp(
 // Scatter a probes x sample_count block back into a samples x probes matrix.
 // This deliberately mutates `destination` in place, which is safe only when it
 // is a freshly allocated private matrix (never an alias of the caller's input);
-// bmiq_calibration() allocates `calibrated` for exactly this reason. Nothing
-// here can enforce that: MAYBE_SHARED() would refuse the only legitimate
-// caller, because the generated R wrapper already binds `destination` as a
-// formal. It stays a caller invariant.
+// betanorm's bmiq_calibration() allocates `calibrated` for exactly this
+// reason. Nothing here can enforce that: MAYBE_SHARED() would refuse the only
+// legitimate caller, because the generated R wrapper already binds
+// `destination` as a formal. It stays a caller invariant.
 // [[Rcpp::export(rng = false)]]
 void scatter_sample_block_cpp(
     SEXP destination,
@@ -734,8 +734,8 @@ Rcpp::List beta_mixture_em_cpp(
             // Single-exp E-step: responsibilities reuse the max-shifted
             // exponentials rather than re-exponentiating against
             // maximum + log(sum_exp). Not bit-identical to the log-space form
-            // (see DECISIONS.md, single-exp adoption); snapshots pin the
-            // current numerics.
+            // (see betanorm's dev/DECISIONS.md, single-exp adoption);
+            // betanorm's snapshots pin the current numerics.
             const double inv_sum = 1.0 / sum_exp;
 
             for (R_xlen_t k = 0; k < K; ++k)

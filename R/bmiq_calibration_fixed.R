@@ -2,9 +2,9 @@
 # Teschendorff's BMIQ v1.2), whose EM is modified from RPMM (Houseman and
 # Koestler, GPL >= 2). GPL (>= 3) here; see inst/COPYRIGHTS.
 
-# bmiq_calibration() at the legacy configuration against a built-in gold fit,
-# fitting every value instead of a random subset. Rationale: betanorm's
-# dev/DECISIONS.md.
+# betanorm's bmiq_calibration() at the legacy configuration against a
+# built-in gold fit, fitting every value instead of a random subset.
+# Rationale: betanorm's dev/DECISIONS.md.
 
 FIXED_NITER <- 5L
 FIXED_TOL <- 0.001
@@ -13,9 +13,9 @@ FIXED_BETA_SCORE_TOL <- 1e-10
 FIXED_MODE_WINDOW_LOW <- 0.4
 FIXED_MODE_WINDOW_HIGH <- 0.6
 
-# bmiq_gold_fit() of each gold vector with nfit at its length, written by
-# data-raw/bmiq_gold_fixed.R.
-# horvath: horvath_goldstandard[["goldstandard2"]] (Horvath 2013).
+# betanorm's bmiq_gold_fit() of each gold vector with nfit at its length,
+# written by betanorm's data-raw/bmiq_gold_fixed.R.
+# horvath: betanorm's horvath_goldstandard[["goldstandard2"]] (Horvath 2013).
 FIXED_GOLD <- list(
   horvath = list(
     a = c(
@@ -217,9 +217,10 @@ fixed_fit_mixture <- function(beta, thresholds) {
   list(a = a, b = b, mu = mu, class = class)
 }
 
-# FIXED_QTABLE (R/sysdata.rda, built by data-raw/bmiq_gold_qtable.R) holds,
-# per gold set, components U and M, each two half-tables, Beta(a, b) and
-# Beta(b, a): log Q(p) as quintic Hermite pieces in log p, p in [1e-30, 1/2].
+# FIXED_QTABLE (betanorm's R/sysdata.rda, built by betanorm's
+# data-raw/bmiq_gold_qtable.R) holds, per gold set, components U and M, each
+# two half-tables, Beta(a, b) and Beta(b, a): log Q(p) as quintic Hermite
+# pieces in log p, p in [1e-30, 1/2].
 fixed_gold_qtable <- function(gold) {
   qtable <- FIXED_QTABLE[[gold]]
   shapes <- FIXED_GOLD[[gold]]
@@ -310,20 +311,16 @@ fixed_map_beta_q <- function(x, a.sample, b.sample, gold.table, lower.tail) {
   )
 }
 
-#' Calibrate beta values to a built-in gold standard
-#'
-#' `bmiq_calibration()` at the legacy configuration (`nL = 3` with H,
-#' `niter = 5`) against a built-in gold-standard fit, with every value of
-#' the gold and of each sample fitted instead of a random subset of 20000.
-#' A sample that cannot be calibrated becomes a row of `NA`.
-#'
-#' @param datM Double matrix of beta values in \eqn{[0, 1]}, samples in rows.
-#' @param gold Name of the built-in gold standard.
-#'
-#' @return The calibrated matrix, the size of `datM`.
-#'
-#' @keywords internal
-#' @noRd
+# Calibrates beta values to a built-in gold standard: betanorm's
+# bmiq_calibration() at the legacy configuration (nL = 3 with H, niter = 5)
+# against a built-in gold-standard fit, with every value of the gold and of
+# each sample fitted instead of a random subset of 20000. A sample that
+# cannot be calibrated becomes a row of NA. Not exported by betanorm, and
+# no help page.
+#
+# datM: double matrix of beta values in [0, 1], samples in rows.
+# gold: name of the built-in gold standard.
+# Returns the calibrated matrix, the size of datM.
 bmiq_calibration_fixed <- function(datM, gold = "horvath") {
   checkmate::assert_choice(gold, names(FIXED_GOLD))
   checkmate::assert_matrix(

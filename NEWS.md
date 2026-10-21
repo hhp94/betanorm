@@ -1,3 +1,19 @@
+# betanorm 0.1.5
+
+* The files a downstream package copies are usable as they are, with no
+  edit: `R/bmiq_calibration_fixed.R`, the new `R/quantile_norm_fixed.R`,
+  `src/bmiq_norm.cpp`, `src/quantile_norm.cpp` and
+  `data-raw/fixed_qtable_horvath.rds`. They carry no roxygen lines, and a
+  comment in them that names a file or function the copy does not carry
+  says "betanorm's".
+* New internal `quantile_norm_fixed()`, not exported: `quantile_norm()`
+  under another name, in a file of its own. `quantile_norm()` is
+  unchanged.
+* Each gold's quantile table is also stored on its own, as
+  `data-raw/fixed_qtable_<gold>.rds`, and `FIXED_QTABLE` in
+  `R/sysdata.rda` is built from those files. Its value is unchanged, and
+  so are all results.
+
 # betanorm 0.1.4
 
 * The mixture EM is about twice as fast: per E-step it takes one `log`

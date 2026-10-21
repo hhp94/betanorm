@@ -29,7 +29,8 @@ What touches the input values today:
   its own `scan_finite_unit_interval_cpp()`. A prefit skips all of this.
 - `quantile_norm(obj, target)`: `assert_matrix()` for the shape, one
   `assert_numeric(any.missing = FALSE, finite = TRUE)` pass over `obj`
-  (since chunk 1), and one over `target`.
+  (since chunk 1), and one over `target`. `quantile_norm_fixed()` is the
+  same code, pinned `identical()`, so a change goes into both.
 - The downstream does its value scan per sample instead (DECISIONS.md,
   2026-10-05, "divergences"), so a change here also bears on what it
   copies.

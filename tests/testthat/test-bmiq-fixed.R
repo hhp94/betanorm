@@ -129,6 +129,21 @@ test_that("the stored table is built for every gold set on the documented grid",
   }
 })
 
+test_that("each gold's table file in data-raw/ is its FIXED_QTABLE entry", {
+  # data-raw/ is build-ignored, so R CMD check runs without it.
+  data.raw <- test_path("..", "..", "data-raw")
+  skip_if_not(dir.exists(data.raw), "data-raw/ is absent")
+
+  expect_setequal(
+    list.files(data.raw, pattern = "^fixed_qtable_.*[.]rds$"),
+    paste0("fixed_qtable_", names(FIXED_QTABLE), ".rds")
+  )
+  for (gold in names(FIXED_QTABLE)) {
+    path <- file.path(data.raw, paste0("fixed_qtable_", gold, ".rds"))
+    expect_true(identical(readRDS(path), FIXED_QTABLE[[gold]]))
+  }
+})
+
 test_that("the gold quantile table reproduces stats::qbeta for every gold set", {
   for (gold in names(FIXED_GOLD)) {
     qtable <- FIXED_QTABLE[[gold]]

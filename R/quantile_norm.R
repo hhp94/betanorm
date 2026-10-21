@@ -2,6 +2,9 @@
 # copyright Ben Bolstad, LGPL (>= 2). Distributed here under GPL (>= 3).
 # See inst/COPYRIGHTS.
 
+# R/quantile_norm_fixed.R holds this function again, for the files a
+# downstream package copies; test-quantile-norm.R pins the two identical().
+
 #' Quantile Normalization to a Target Distribution
 #'
 #' Minimal, no-missing-data port of

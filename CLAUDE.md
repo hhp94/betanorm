@@ -36,12 +36,19 @@ those there without new evidence. Work in flight is tracked in
 - Execution starts **serial**. Parallelism is added only after extensive
   testing and experimentation justify it; DECISIONS.md records what has
   been measured and why earlier attempts were rejected.
-- **The vendored files follow the downstream code rules.** A downstream
-  package copies `R/bmiq_calibration.R` (or `R/bmiq_calibration_fixed.R`
-  with the `FIXED_QTABLE` object from `R/sysdata.rda`, which together
-  stand alone), `R/quantile_norm.R`, `src/bmiq_norm.cpp`,
-  `src/quantile_norm.cpp` and `inst/COPYRIGHTS`,
-  stripping only roxygen lines, so its rules hold here (DECISIONS.md,
+- **The copied files are used as they are.** A downstream GPL (>= 3)
+  package copies `R/bmiq_calibration_fixed.R`, `R/quantile_norm_fixed.R`,
+  `src/bmiq_norm.cpp`, `src/quantile_norm.cpp` and
+  `data-raw/fixed_qtable_horvath.rds` byte for byte from GitHub at a
+  pinned commit, and edits nothing; it regenerates `RcppExports.*` and has
+  its own `inst/COPYRIGHTS`. Whatever it needs changed is changed here
+  (DECISIONS.md, 2026-10-21). In those files:
+  - no roxygen: no `#'` or `//'` line, only plain comments;
+  - every comment stays true inside another package: a betanorm file,
+    function or object the copy does not carry is "betanorm's";
+  - `quantile_norm_fixed()` is `quantile_norm()` again, pinned
+    `identical()` in `test-quantile-norm.R`: edit both or neither.
+- **The vendored files follow the downstream code rules** (DECISIONS.md,
   2026-10-20):
   - every Rcpp export is `// [[Rcpp::export(rng = false)]]`; no kernel
     draws a random number;
