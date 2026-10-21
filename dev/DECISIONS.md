@@ -774,6 +774,125 @@ session without the call. Only a draw that bypasses R's generator (the
 subset reproduced in C++) would avoid it, which is not worth the code
 for a normal kind few sessions use.
 
+## 2026-10-20 — A kernel-only review of `bmiq_norm.cpp` (0.1.3)
+
+An agent shown `src/bmiq_norm.cpp` alone, without the R callers or this
+log, reviewed it for CRAN and memory safety and for speed. What it
+raised that bears on this package, and the outcome of each, is recorded
+here; the report itself is not tracked (user, 2026-10-20). It found no
+memory-management fault: the kernels write only through live Rcpp
+objects, nothing needs `PROTECT` by hand, and the copy of
+`initial_responsibility` keeps the E-step off the caller's matrix. One
+test was added; no code changed and no number moved.
+
+Taken:
+
+- **A test that `datM` comes back as found.** The report's main point:
+  `scatter_sample_block_cpp()` writes into its destination in place,
+  past copy-on-modify, so it is safe only while every caller passes a
+  freshly allocated private matrix, and a test should hold the public
+  functions to leaving their input unchanged, compared with an
+  independent copy rather than another binding. Both functions allocate
+  a fresh output, but nothing pinned it: an edit such as
+  `calibrated <- datM`, to keep the dimnames, would write the calibrated
+  values into the caller's matrix. `test-input-preserved.R` runs
+  `bmiq_calibration_fixed()` and `bmiq_calibration()` (`failed.sample`
+  "NA" and "original") over 11 samples, two blocks with a failed sample
+  in the second, and compares `datM` with a copy made by `serialize()`
+  (`saved <- datM` would be a second binding of the same vector). With
+  `calibrated <- datM` in either file, it fails. The rest of the point
+  (the wrapper stays internal; a `MAYBE_SHARED()` check would refuse the
+  legitimate caller) is already so, and in the kernel's comment.
+- **When a CRAN submission is planned:** one run under valgrind and the
+  sanitizers, and a small case under `gctorture(TRUE)`. Only
+  `devtools::check()` has been run so far.
+
+Declined:
+
+- **Interrupt checks inside the passes.** The report: one
+  `checkUserInterrupt()` per EM iteration leaves the scan, the gather
+  and scatter and the E-step without one; check every 65536 elements.
+  No call runs long enough: an EM call takes 10 ms with a check at each
+  iteration, about 2 ms apart, and gathering six samples takes 39 µs
+  (measured below).
+- **Validating the EM controls and initial responsibilities in C++.**
+  The report: `maxiter` NA or below 1 returns placeholder shapes,
+  `BetaStats::add()` skips negative and NaN responsibilities silently,
+  and the rows need not sum to 1. "Not taken: C++-side validation of the
+  EM scalars" (2026-10-05) stands. The fixed path passes constants and the kernel defaults; the
+  general path asserts `niter >= 1` and passes the defaults for the
+  halving limit, `min_shape` and `armijo`. Both build `w.init` one-hot
+  with at least two members per class, so each component starts with an
+  effective size of at least 2, and the E-step's own responsibilities
+  are finite and non-negative by construction. Even `maxiter = 0`, which
+  returns placeholder shapes with `eta = 0`, would stop at the fixed
+  path's "Invalid mixture parameters." check.
+- **Subtraction-based block bounds.** The report: `first0 + count >
+  n_samples` can overflow; test `count > n_samples - first0` instead.
+  It can overflow only where `R_xlen_t` is 32 bits; R dropped 32-bit
+  Windows in 4.2.0 and CRAN no longer checks i386. Callers pass a start in 1..nrow
+  and a count of at most 8, and chunk 2 does not reopen the 2026-10-05
+  hardening. The comments' "wraps negative" is loose (signed overflow is
+  undefined; it wrapped in practice); the next edit of the file can say
+  so.
+- **The halving loop's counter.** The report:
+  `for (int h = 0; h <= max_halving; ++h)` overflows `h` at
+  `max_halving = INT_MAX` when no step is accepted. The loop runs to its
+  limit only when a shape starts exactly at
+  `min_shape` and Newton points below it, and neither caller passes
+  `beta_max_halving`, so the limit is the default 30. The 2026-10-05
+  rule applies: revisit if the argument becomes reachable from user
+  input.
+- **Tolerance-based instead of exact regression tests.** The report:
+  `std::lgamma`, `log` and `exp` differ across platforms. Against
+  "Numeric exactness is the contract". The snapshots already hold to
+  1e-12, not bit for bit, and the portability point is chunk 2's
+  `std::lgamma` entry.
+- Agreed with what is here: the extra memory is ordinary (about 40
+  bytes per observation at K = 3, the cached logs and the copied
+  responsibilities), and the numerical safeguards stay (Welford
+  variance, log-sum-exp, the cached logs, no `-ffast-math`).
+
+**Speed.** The report proposed fewer full passes over the data and warm
+starts for Newton, without measuring. Measured with R CMD build and INSTALL at R's
+default -O2 (R 4.6.0, `bench::mark` medians) on the six EPIC samples
+(20306 probes), the EM calls on the inputs captured from the fixed path
+(n = 20000): `bmiq_calibration_fixed()` 113.7 ms, 19 ms per sample; one
+EM call 9.99 ms at `maxiter = 5` (every call runs all five), 2.84 ms at
+`maxiter = 1`, and 0.55 ms on a 600-point subset of the same inputs. The
+EM is about 53% of the fixed path: since the gold quantile table, chunk
+2's "the quantile map is where the time goes" holds for
+`bmiq_calibration()` but not for the fixed path. The report's proposals
+still miss:
+
+- Warm-starting each M-step's Newton fit from the previous shapes
+  instead of the method of moments: the per-component work is at most
+  0.55 ms per call, about 3% of the run, and the change moves numbers.
+- Accumulating the next M-step's statistics inside the E-step loop, so
+  the responsibilities are not read again: bit-identical, since each
+  component gets the same values in the same order, but it saves only
+  rereading a working set of about 1 MB that sits in cache; the Welford
+  divisions and the E-step's `exp` and `log` stay. A bench candidate if
+  the EM ever needs to be faster.
+- Making `w` optional changes the return list pinned by
+  `test-cpp-contract.R`, and the general path reads `w` for its
+  responsibility-count diagnostic. Fixed-size arrays and templates on
+  K, and building the status strings once at return, save microseconds
+  per call. Tiling the gather and scatter: the gather takes 39 µs and
+  is already one cache line per probe ("Rejected cleanups").
+
+Noted, not measured: per observation the E-step calls `exp` K times and
+`log` once, likely most of the EM's time. For the largest component
+`log_component[k] - maximum` is exactly 0 and `exp(0)` is exactly 1, so
+skipping that call would be bit-identical.
+
+Known, for a CRAN submission: testthat skips snapshot expectations on
+CRAN (`cran = FALSE`), so `test-numeric-regression.R` does not run
+there, but the `identical()` pin of the stored gold fit against a live
+`bmiq_gold_fit()` in `test-bmiq-fixed.R` does, and on another libm it is
+expected to fail (the one-file entry above). It would need
+`skip_on_cran()`.
+
 ## 2026-09-25 — GPL (>= 3), with the upstream authors as `cph` (0.1.0)
 
 Recorded 2026-10-20, from the deleted `dev/relicense-plan.md`.
