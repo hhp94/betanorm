@@ -4,7 +4,7 @@
 \alias{bmiq_calibration_fixed}
 \title{Calibrate Beta Values to a Built-in Gold Standard (Legacy Configuration)}
 \usage{
-bmiq_calibration_fixed(datM, gold = "horvath", verbose = TRUE)
+bmiq_calibration_fixed(datM, gold = "horvath", verbose = TRUE, qtable = NULL)
 }
 \arguments{
 \item{datM}{Double-precision numeric matrix of beta values: samples in
@@ -18,6 +18,12 @@ standard is consumed purely distributionally, so \code{datM} need not hold
 its probes.}
 
 \item{verbose}{If \code{TRUE}, print progress messages.}
+
+\item{qtable}{A table from \code{\link[=bmiq_gold_qtable]{bmiq_gold_qtable()}} for the same \code{gold}, or
+\code{NULL} to build it in the call (about 70 ms). Build it once and pass it
+when calibrating many matrices in a session. A passed table is checked
+against the built-in gold shapes and grid and refused if it does not
+match.}
 }
 \value{
 The calibrated beta matrix, the size of \code{datM} with its dimnames.
@@ -33,13 +39,15 @@ is built into the package. Every setting is fixed: \code{nL = 3} with H
 normalization, \code{niter = 5}, \code{nfit = 20000}, \code{tol = 0.001},
 \code{beta.maxit = 50}, \code{beta.score.tol = 1e-10}, a skipped H step keeps the
 U-plus-upper-M calibration (\code{h.policy = "optional"}), and a failed sample
-becomes a row of \code{NA} (\code{on.sample.error = "continue"}). The output is identical to
-\verb{bmiq_calibration(datM, <gold vector>)} at its defaults, and the gold
-mixture is not refitted on each call.
+becomes a row of \code{NA} (\code{on.sample.error = "continue"}). The output
+agrees with \verb{bmiq_calibration(datM, <gold vector>)} at its defaults to
+within 1e-14: the gold mixture is not refitted on each call, and the
+gold side of the quantile map reads a precomputed table
+(\code{\link[=bmiq_gold_qtable]{bmiq_gold_qtable()}}) in place of \code{\link[stats:qbeta]{stats::qbeta()}}.
 }
 \details{
 The function exists for pipelines that run one fixed configuration and
-copy the code: it has no options to validate, no gold vector to fit, and
+copy the code: it has no settings to choose, no gold vector to fit, and
 no result object. See \code{\link[=bmiq_calibration]{bmiq_calibration()}} for what the
 procedure does and how it departs from legacy BMIQ code, and for the
 two-component model, error policies and diagnostics it offers.
