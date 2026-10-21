@@ -88,3 +88,54 @@ test_that("the fit subset does not follow the caller's RNG kind", {
   expect_identical(run(), reference)
   expect_identical(RNGkind()[[3L]], "Rounding")
 })
+
+test_that("a session with no .Random.seed keeps its RNG kind", {
+  # With no seed, the kind is only in R's internal state, which the draw's
+  # set.seed() changes.
+  global <- globalenv()
+  saved.kind <- RNGkind()
+  saved.seed <- get0(".Random.seed", envir = global, inherits = FALSE)
+  on.exit(
+    {
+      suppressWarnings(RNGkind(
+        kind = saved.kind[[1L]],
+        normal.kind = saved.kind[[2L]],
+        sample.kind = saved.kind[[3L]]
+      ))
+      if (is.null(saved.seed)) {
+        rm(".Random.seed", envir = global)
+      } else {
+        assign(".Random.seed", saved.seed, envir = global)
+      }
+    },
+    add = TRUE
+  )
+
+  inputs <- make_calibration_inputs(n_probes = 500L, seed = 3L)
+  calls <- list(
+    bmiq_calibration = function() {
+      bmiq_calibration(inputs$datM, inputs$gold, nfit = 500L, verbose = FALSE)
+    },
+    bmiq_gold_fit = function() {
+      bmiq_gold_fit(inputs$gold, nfit = 500L, verbose = FALSE)
+    },
+    bmiq_calibration_fixed = function() bmiq_calibration_fixed(inputs$datM)
+  )
+  kinds <- list(
+    c("L'Ecuyer-CMRG", "Inversion", "Rejection"),
+    c("Mersenne-Twister", "Box-Muller", "Rounding")
+  )
+
+  for (name in names(calls)) {
+    for (kind in kinds) {
+      suppressWarnings(RNGkind(kind[[1L]], kind[[2L]], kind[[3L]]))
+      rm(".Random.seed", envir = global)
+      calls[[name]]()
+      expect_identical(RNGkind(), kind, info = name)
+      expect_false(
+        exists(".Random.seed", envir = global, inherits = FALSE),
+        info = name
+      )
+    }
+  }
+})

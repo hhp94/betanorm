@@ -20,6 +20,11 @@
   `stats::qbeta()` and is unchanged.
 * Its source file and the stored table (`FIXED_QTABLE` in
   `R/sysdata.rda`) stand alone.
+* `bmiq_calibration()` and `bmiq_gold_fit()` keep the session's
+  random-number generator kind when the session has no `.Random.seed`.
+  Before, a session that chose another kind (for example
+  `"L'Ecuyer-CMRG"`) and then removed `.Random.seed` was left on R's
+  default kind. Results are unchanged.
 
 # betanorm 0.1.2
 

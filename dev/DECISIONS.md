@@ -332,7 +332,8 @@ Changed, no number moved in a default session:
   in place puts the caller's kind back (the kind lives in `.Random.seed`).
   Pinned in `test-random-state.R`. A session that removed its
   `.Random.seed` by hand after choosing another kind is left on the
-  default kind; nothing else can reach that state.
+  default kind; nothing else can reach that state. (Closed the same day:
+  see "The fit-subset draw also restores the RNG kind" below.)
 - **A prefitted gold has an owner.** `check_gold_fit()` checks a
   user-supplied `bmiq_gold_fit` (`nL`, `a`, `b`, `thresholds`, the two
   modes) at the entry point. A fresh `bmiq_gold_fit()` result satisfies it
@@ -739,6 +740,39 @@ ones. `test-bmiq-fixed.R` drops the message and sample-list checks, pins
 the two warnings' text and the progress line, which only a run of more
 than 200 samples gets (201 samples that fail at once), and mocks the
 fitter with its new signature.
+
+## 2026-10-20 — The fit-subset draw also restores the RNG kind with no seed (0.1.3)
+
+In both `draw_fit_indices()` and `fixed_draw_fit_indices()` (user,
+2026-10-20). The draw keeps its save-and-restore rather than the plain
+`set.seed(1)` of legacy BMIQ (`dev/bmiq-calibration-legacy.R`): a fixed
+seed left in place replaces the caller's stream, so every draw after
+the call, in every iteration of a loop, would follow seed 1.
+
+The gap closed: with no `.Random.seed`, the caller's kind lives only in
+R's internal state, and the draw's `set.seed(kind = "Mersenne-Twister",
+...)` changes it. Removing the seed afterwards left the session on
+Mersenne-Twister / Inversion / Rejection. The no-seed branch now saves
+`RNGkind()` (which, called with no arguments, writes no seed) and sets
+it back on exit, then removes the seed that call writes. Reachable only
+by choosing a kind and then removing `.Random.seed` by hand, since
+`RNGkind()` and `set.seed()` both write one. Pinned in
+`test-random-state.R` for `bmiq_calibration()`, `bmiq_gold_fit()` and
+`bmiq_calibration_fixed()` under two non-default kinds (6 of 6 checks
+fail without the fix). No number moves: the draw itself is unchanged.
+
+Checked by a probe against a run without the call: a fresh session, a
+`set.seed(42)` session with or without draws since, "L'Ecuyer-CMRG" and
+`sample.kind = "Rounding"` all keep the same seed, kind and next draws,
+and the call leaves no other object in the global environment.
+
+Known, and not fixable from R: under `normal.kind = "Box-Muller"`, R
+keeps the second normal of each pair in an internal variable that
+`.Random.seed` does not hold, and every `set.seed()` clears it. After an
+odd number of `rnorm()` draws, the caller's next normals differ from a
+session without the call. Only a draw that bypasses R's generator (the
+subset reproduced in C++) would avoid it, which is not worth the code
+for a normal kind few sessions use.
 
 ## 2026-09-25 — GPL (>= 3), with the upstream authors as `cph` (0.1.0)
 

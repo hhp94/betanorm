@@ -402,9 +402,20 @@ draw_fit_indices <- function(n, size, seed) {
       add = TRUE
     )
   } else {
+    # With no .Random.seed the caller's kind lives only in R's internal
+    # state, which set.seed() below changes, so put it back explicitly.
+    # RNGkind() writes a seed doing so, and that is removed after it.
+    saved.kind <- RNGkind()
     on.exit(
-      if (exists(".Random.seed", envir = globalenv(), inherits = FALSE)) {
-        rm(".Random.seed", envir = globalenv())
+      {
+        suppressWarnings(RNGkind(
+          kind = saved.kind[[1L]],
+          normal.kind = saved.kind[[2L]],
+          sample.kind = saved.kind[[3L]]
+        ))
+        if (exists(".Random.seed", envir = globalenv(), inherits = FALSE)) {
+          rm(".Random.seed", envir = globalenv())
+        }
       },
       add = TRUE
     )
