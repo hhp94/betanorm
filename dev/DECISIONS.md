@@ -421,6 +421,10 @@ entries hold the outcomes; the full log is in git history, as
 
 ## 2026-10-20 — `bmiq_calibration_fixed()`: the legacy configuration as one file (0.1.3)
 
+Amended the same day by the gold quantile table entry below: the gold
+side of `map_beta_q` now reads a table, and the output pin is 1e-14, not
+`identical()`. The rest stands.
+
 `R/bmiq_calibration_fixed.R` is `bmiq_calibration()` cut to the Horvath
 legacy configuration, for the downstream package to vendor in place of
 `R/bmiq_calibration.R` (user, 2026-10-20). It stands alone: it shares no
@@ -472,6 +476,124 @@ Measured on the six EPIC samples (load_all at -O2, median of 3): general
 with the raw gold 0.39 s, general with a prefit 0.32 s, fixed 0.35 s. The
 gold fit is all that is saved; the quantile map still dominates
 (`dev/to-do.md`, gold quantile table).
+
+## 2026-10-20 — Gold quantile table in `bmiq_calibration_fixed()` (0.1.3, deliberate numerics change)
+
+The gold side of the quantile map in `bmiq_calibration_fixed()` reads a
+precomputed table in place of `stats::qbeta()`; the sample side stays
+`stats::pbeta()` in probability space, and `bmiq_calibration()` is
+untouched. The gold shapes are constant for a run (the gold is consumed
+distributionally), so `qbeta(p, a.gold, b.gold)` is one fixed function
+per component and tail, and Rmath's `qbeta` is a crude initial guess
+plus Newton iterations on `pbeta`: a table is a better initial guess,
+and at a fine enough grid it is the answer.
+
+**The table** (`bmiq_gold_qtable(gold)`): per gold component, two
+halves, Beta(a, b) and Beta(b, a), each the lower-tail quantile for p in
+[1e-30, 1/2] on 8192 nodes uniform in u = log p, stored as per-interval
+quintic Hermite coefficients of v = log x in t = (u - u_i) / h, from v,
+dv/du = p / (x f(x)) and the analytic second derivative, evaluated by
+Horner. The reflection x -> 1 - x swaps the shapes and the tails, so the
+upper tail reads the swapped half and p above 1/2 reads 1 - p (as
+`log(-expm1(u))`) from the swapped half. p = 0 and 1 are exact. p at or
+below 1e-30, and any element the table does not place in [0, 1], fall
+back to `stats::qbeta(p, ...)` in probability space, bit-identical to the
+general function (no real input hits it). Nodes are anchored at
+u1 = log(1/2), node i = u1 - (n - i) h, and the evaluator rebuilds a
+node with that same expression: nodes from `seq()` reconstructed as
+u0 + i h disagreed by 2.5e-11 at n = 4096, which put a 1e-12 floor under
+every Hermite variant until found.
+
+**Why quintic alone at n = 8192** (Phase 1, `dev/qtable-exp.R`,
+2026-10-20). Reference: the production path `qbeta(pbeta(x))`. Real
+inputs: 88,292 gold-side evaluations of the six EPIC samples at the
+three call sites, reproduced bit for bit from `bmiq_calibration_fixed()`
+first. Sweep: 81,015 p per (component, tail), all four combinations:
+nodes, 20k interval interiors, 20k random, their mirrors above 1/2, the
+ends, the neighbours of 1/2 and of p.min, p next to 1. Timings: sample 1
+(14,778 evaluations), `load_all` at -O2, `bench::mark` median; "map" is
+the full production map including the sample-side `pbeta`. mono =
+monotonicity violations beyond 1 ulp over the four sweeps (Rmath's own
+`qbeta` has 1).
+
+| variant | n | real max | bit-id % | <=1 ulp % | sweep max | mono | us/elem | map ms | build ms | size KB |
+|---|---|---|---|---|---|---|---|---|---|---|
+| rmath |  | 0 | 100 | 100 | 0 | 1 | 2.07 | 34.7 | 0 | 0 |
+| cubic | 1024 | 3.1e-08 | 0.0 | 0.0 | 3.1e-08 | 2 | 0.16 | 6.9 | 10 | 128 |
+| cubic + Newton | 1024 | 6.3e-15 | 39.4 | 48.4 | 6.2e-15 | 2 | 0.58 | 13.1 | 10 | 128 |
+| quintic | 1024 | 3.9e-11 | 2.8 | 3.4 | 3.8e-11 | 2 | 0.17 | 7.0 | 10 | 192 |
+| quintic + Newton | 1024 | 3.3e-16 | 44.3 | 55.5 | 2.2e-16 | 2 | 0.58 | 13.1 | 10 | 192 |
+| cubic | 2048 | 2.1e-09 | 0.0 | 0.1 | 2.1e-09 | 2 | 0.16 | 6.9 | 16 | 256 |
+| cubic + Newton | 2048 | 2.2e-16 | 43.8 | 55.1 | 2.2e-16 | 1 | 0.57 | 13.0 | 16 | 256 |
+| quintic | 2048 | 6.9e-13 | 11.6 | 14.4 | 6.9e-13 | 2 | 0.17 | 7.1 | 16 | 384 |
+| quintic + Newton | 2048 | 3.3e-16 | 45.9 | 57.4 | 3.3e-16 | 1 | 0.58 | 13.1 | 16 | 384 |
+| cubic | 4096 | 1.4e-10 | 0.2 | 0.2 | 1.4e-10 | 2 | 0.16 | 6.9 | 34 | 512 |
+| cubic + Newton | 4096 | 3.3e-16 | 43.8 | 54.9 | 2.2e-16 | 2 | 0.58 | 13.0 | 34 | 512 |
+| quintic | 4096 | 1.2e-14 | 27.9 | 35.5 | 1.2e-14 | 2 | 0.17 | 7.0 | 34 | 768 |
+| quintic + Newton | 4096 | 3.3e-16 | 48.5 | 61.5 | 3.3e-16 | 2 | 0.58 | 13.1 | 34 | 768 |
+| cubic | 8192 | 8.9e-12 | 0.8 | 1.0 | 8.9e-12 | 2 | 0.17 | 7.0 | 66 | 1024 |
+| cubic + Newton | 8192 | 2.2e-16 | 44.0 | 55.2 | 3.3e-16 | 2 | 0.58 | 13.1 | 66 | 1024 |
+| **quintic** | **8192** | **3.3e-16** | 39.8 | 51.4 | **3.3e-16** | 2 | **0.17** | **7.1** | 66 | 1536 |
+| quintic + Newton | 8192 | 3.3e-16 | 51.1 | 65.1 | 2.2e-16 | 2 | 0.59 | 13.3 | 66 | 1536 |
+| cubic | 16384 | 5.6e-13 | 3.5 | 4.3 | 5.6e-13 | 2 | 0.17 | 7.2 | 132 | 2048 |
+| cubic + Newton | 16384 | 2.2e-16 | 44.5 | 55.8 | 2.2e-16 | 2 | 0.59 | 13.2 | 132 | 2048 |
+| quintic | 16384 | 3.3e-16 | 40.4 | 52.0 | 2.2e-16 | 2 | 0.17 | 7.2 | 132 | 3072 |
+| quintic + Newton | 16384 | 3.3e-16 | 51.2 | 65.5 | 2.2e-16 | 2 | 0.60 | 13.3 | 132 | 3072 |
+
+Quintic alone converges as h^6 (3.9e-11, 6.9e-13, 1.2e-14, then the
+3.3e-16 floor from n = 8192), where it is as accurate as any Newton
+variant on the real inputs and the whole sweep; cubic alone is h^4 and
+never reaches the bar by 16384. Any Newton step lands at the floor from
+n = 2048 regardless of the interpolant, and costs 0.4 us per element
+(map 13.0 ms against 7.1 ms per sample). Polishing the nodes with Newton
+at build time changed nothing: the `qbeta(log.p = TRUE)` nodes already
+solve log F = u to 1.4e-14. The two interpolants cost the same per
+element; the lookup, not the arithmetic, is the cost. Newton is dropped,
+not kept as an option: one path to test and vendor. Cost of the choice:
+66 ms to build and 1.5 MB per table.
+
+**API** (user, 2026-10-20): an explicit `qtable = NULL` argument after
+`verbose` and the exported builder, not a package-level cache. Reuse is
+visible in caller code, nothing lives in a hidden environment, and the
+vendored file stays self-contained. `NULL` builds the table in the call;
+a passed table is validated: layout, schema version, gold name, every
+shape against `FIXED_GOLD`, the grid constants, finite coefficient
+vectors of the right length, and a spot check at sixteen interval
+midpoints per half against `stats::qbeta()` at 1e-12 (built tables sit at
+1e-16; shifted, foreign or differently built coefficients miss by far
+more; review, 2026-10-20). The version is bumped whenever what a table
+holds changes, the coefficient construction included. A table saved with
+`saveRDS()` and read back is accepted.
+
+**Contract.** `bmiq_calibration_fixed()` agrees with the `calibrated`
+element of `bmiq_calibration(datM, gold, on.sample.error = "continue")`
+to within 1e-14 max-abs, with identical dimnames and NA pattern
+(measured 3.3e-16 on the six EPIC samples, 41.8% of values
+bit-identical). Not bit for bit, so a deliberate numerics change under
+CLAUDE.md, as the single-exp E-step was: NEWS and this entry. The
+snapshots at 1e-12 pass unchanged, since the general function is
+untouched; the gold-fit pin stays `identical()`.
+`tests/testthat/test-bmiq-fixed.R` sweeps the table against
+`stats::qbeta()` for every gold set in `names(FIXED_GOLD)`, which is what
+carries the guarantee to a gold set added later, and on the real
+gold-side inputs harvested from the general function's diagnostics;
+checks the nodes, the fallback, nineteen malformed tables, the saved
+table round trip and the random state.
+
+Measured on the six EPIC samples (20306 probes; installed at -O2, median
+of 5, 10 ms timer): general 0.30 s, fixed with `qtable = NULL` 0.25 s,
+fixed with a passed table 0.16 s, build alone 0.07 s. `devtools::check()`
+clean.
+
+Closed in `dev/to-do.md`: "Gold quantile table + Newton polish" (landed,
+Newton dropped as measured above) and "Boost + RcppThread quantile-map
+bench" (superseded: the table reaches most of that goal serially, with no
+dependency and without forking the numerics beyond the last ulp; its
+prior art, `boost_math_exports.cpp`, `inst/include/bmiqpp/boost_math.hpp`
+and `test-boost-math.R`, stays tracked for a later threading thread).
+`dev/qtable-exp.R` is opted in: the code comments, the tests and this
+entry cite it. The hand-off plan `dev/bmiq_calibration_fixed.md` stays
+untracked; this entry is its outcome.
 
 ## 2026-09-25 — GPL (>= 3), with the upstream authors as `cph` (0.1.0)
 

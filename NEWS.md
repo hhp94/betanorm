@@ -4,11 +4,21 @@
   legacy three-state configuration) against a built-in gold-standard fit
   chosen by name. `gold = "horvath"` is the fit of
   `horvath_goldstandard$goldstandard2`, so nothing is refitted for the
-  gold. It takes only `datM`, `gold` and `verbose`, returns the calibrated
-  matrix, turns a failed sample into a row of `NA` (the warning gives its
-  index and the error), and warns which samples ran without H. Its output
-  is identical to `bmiq_calibration(datM, horvath_goldstandard$goldstandard2)`,
-  and its source file stands alone, for pipelines that copy the code.
+  gold. It takes `datM`, `gold`, `verbose` and `qtable`, returns the
+  calibrated matrix, turns a failed sample into a row of `NA` (the warning
+  gives its index and the error), and warns which samples ran without H.
+  Its output agrees with the `calibrated` element of
+  `bmiq_calibration(datM, horvath_goldstandard$goldstandard2, on.sample.error = "continue")`
+  to within 1e-14 (not bit for bit: see the next item), and its source
+  file stands alone, for pipelines that copy the code.
+* New `bmiq_gold_qtable()`: the gold-side quantiles that
+  `bmiq_calibration_fixed()` needs, as a precomputed table (quintic Hermite
+  on 8192 nodes in log p, within 1e-14 of `stats::qbeta()`; about 70 ms to
+  build, 1.5 MB). `bmiq_calibration_fixed()` builds one per call by
+  default; pass one as `qtable` to reuse it across calls. On the six EPIC
+  samples the fixed function takes 0.16 s with a passed table against
+  0.30 s for `bmiq_calibration()`, which still calls `stats::qbeta()` and is
+  unchanged.
 
 # betanorm 0.1.2
 
