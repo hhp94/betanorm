@@ -12,29 +12,36 @@
 namespace
 {
 
+    // A strict weak ordering with NaN last: every NaN sorts after every
+    // number and is equivalent to every other NaN (as -0 is to 0). A bare
+    // `a < b` makes NaN equivalent to everything, which is not a strict weak
+    // ordering and violates std::sort's precondition (UB: measured to
+    // silently drop the NaN and return plausible wrong numbers, and to leave
+    // a target unsorted). quantile_norm_fixed() and betanorm's
+    // quantile_norm() reject NaN in obj and in target before this point;
+    // this keeps the kernel defined if that ever moves. For NaN-free input
+    // every comparison is unchanged, so both sorts are too.
+    inline bool less_nan_last(double a, double b)
+    {
+        if (std::isnan(a))
+        {
+            return false;
+        }
+        if (std::isnan(b))
+        {
+            return true;
+        }
+        return a < b;
+    }
+
     struct DataItem
     {
         double value;
         int index;
 
-        // A total order with NaN last. A bare `value < other.value` makes NaN
-        // equivalent to everything, which is not a strict weak ordering and
-        // violates std::sort's precondition (UB: measured to silently drop the
-        // NaN and return plausible wrong numbers). quantile_norm_fixed() and
-        // betanorm's quantile_norm() reject NaN before this point; this keeps
-        // the kernel defined if that ever moves. For NaN-free input every
-        // comparison is unchanged, so the sort is too.
         bool operator<(const DataItem &other) const
         {
-            if (std::isnan(value))
-            {
-                return false;
-            }
-            if (std::isnan(other.value))
-            {
-                return true;
-            }
-            return value < other.value;
+            return less_nan_last(value, other.value);
         }
     };
 
@@ -119,18 +126,22 @@ namespace
         return target[0];
     }
 
-    // fill items from a contiguous sample column, sort, map ranks -> target.
-    // map_rank is applied once per tie-group.
+    // Ranks one sample and writes its normalized values. The sample is a row
+    // of obj, its values `stride` apart (R is column-major): they are
+    // gathered into items, sorted, and each tie group's value is scattered to
+    // the same row of the result. map_rank is applied once per tie group.
     template <typename MapRank>
-    void normalize_column(
-        double *column,
+    void normalize_row(
+        const double *row,
+        double *result_row,
+        std::size_t stride,
         std::size_t n,
         std::vector<DataItem> &items,
         MapRank map_rank)
     {
         for (std::size_t variable = 0; variable < n; ++variable)
         {
-            items[variable].value = column[variable];
+            items[variable].value = row[variable * stride];
             items[variable].index = static_cast<int>(variable);
         }
 
@@ -156,7 +167,8 @@ namespace
             const double normalized = map_rank(rank);
 
             for (std::size_t k = first; k <= last; ++k)
-                column[items[k].index] = normalized;
+                result_row[static_cast<std::size_t>(items[k].index) * stride] =
+                    normalized;
 
             first = last + 1;
         }
@@ -173,18 +185,22 @@ Rcpp::NumericMatrix qnorm_target_rows_cpp(
         Rcpp::stop("target has length 0");
 
     std::vector<double> sorted_target(target.begin(), target.end());
-    std::sort(sorted_target.begin(), sorted_target.end());
+    std::sort(sorted_target.begin(), sorted_target.end(), less_nan_last);
 
-    // variables x samples: each sample becomes a contiguous column so that
-    // ranking is a linear scan over packed memory (R is column-major).
-    Rcpp::NumericMatrix xt = Rcpp::transpose(obj);
-
-    const int n_variables = xt.nrow();
-    const int n_samples = xt.ncol();
+    const int n_samples = obj.nrow();
+    const int n_variables = obj.ncol();
+    const std::size_t stride = static_cast<std::size_t>(n_samples);
     const std::size_t n = static_cast<std::size_t>(n_variables);
     const std::size_t m = sorted_target.size();
     const double *target_ptr = sorted_target.data();
-    double *xt_data = xt.begin();
+    const double *obj_data = obj.begin();
+
+    // Each sample is gathered from its row of obj and scattered to the same
+    // row of the result, with no transposed copy, so the result is the only
+    // allocation the size of obj. Every cell is written below, so it is not
+    // zero-filled.
+    Rcpp::NumericMatrix result(Rcpp::no_init(n_samples, n_variables));
+    double *result_data = result.begin();
 
     // One variable: a sample has nothing to rank against, so every value
     // maps to the smallest target value (the unequal path would divide by
@@ -192,33 +208,42 @@ Rcpp::NumericMatrix qnorm_target_rows_cpp(
     if (n == 1)
     {
         const double v = target_ptr[0];
-        for (int sample = 0; sample < n_samples; ++sample)
-            xt_data[static_cast<std::size_t>(sample)] = v;
+        for (std::size_t sample = 0; sample < stride; ++sample)
+            result_data[sample] = v;
     }
     else if (n == m)
     {
         std::vector<DataItem> items(n);
-        for (int sample = 0; sample < n_samples; ++sample)
+        for (std::size_t sample = 0; sample < stride; ++sample)
         {
-            double *column =
-                xt_data + static_cast<std::size_t>(sample) * n;
-            normalize_column(column, n, items, [target_ptr](double rank)
-                             { return target_equal_rank(rank, target_ptr); });
+            normalize_row(
+                obj_data + sample,
+                result_data + sample,
+                stride,
+                n,
+                items,
+                [target_ptr](double rank)
+                { return target_equal_rank(rank, target_ptr); });
         }
     }
     else
     {
         // hoisted unequal-path constants (were re-derived per rank group).
+        // preprocessCore divides by n - 1 at each rank instead. The product
+        // with the reciprocal differs from that quotient in its last bit at
+        // some ranks, which moves about one value in seven on this path, by
+        // at most 7e-13 in the cases measured. Kept, so betanorm's results
+        // stay as they are (betanorm's dev/DECISIONS.md, 2026-10-21).
         const double inv_nm1 = 1.0 / static_cast<double>(n - 1);
         const double m1 = static_cast<double>(m - 1);
 
         std::vector<DataItem> items(n);
-        for (int sample = 0; sample < n_samples; ++sample)
+        for (std::size_t sample = 0; sample < stride; ++sample)
         {
-            double *column =
-                xt_data + static_cast<std::size_t>(sample) * n;
-            normalize_column(
-                column,
+            normalize_row(
+                obj_data + sample,
+                result_data + sample,
+                stride,
                 n,
                 items,
                 [inv_nm1, m, m1, target_ptr](double rank)
@@ -228,8 +253,6 @@ Rcpp::NumericMatrix qnorm_target_rows_cpp(
                 });
         }
     }
-
-    Rcpp::NumericMatrix result = Rcpp::transpose(xt);
 
     if (obj.hasAttribute("dimnames"))
     {

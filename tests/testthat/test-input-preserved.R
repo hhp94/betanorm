@@ -46,3 +46,43 @@ test_that("bmiq_calibration and bmiq_calibration_fixed leave datM as found", {
     expect_identical(datM, saved, info = failed.sample)
   }
 })
+
+test_that("quantile_norm, quantile_norm_fixed and the kernel leave obj and target as found", {
+  # The kernel reads obj in place, not through a transposed copy, so a write
+  # through the wrong pointer would land in the caller's matrix; target is
+  # sorted in a copy, and is unsorted here so that a sort in place would
+  # show. Each path runs: equal lengths, unequal lengths, one column. The
+  # rounding gives ties. The saved copies are serialized and read back, as
+  # above.
+  set.seed(31L)
+  wide <- matrix(
+    round(rnorm(7L * 50L), 1),
+    nrow = 7L,
+    dimnames = list(paste0("s", 1:7), paste0("cg", 1:50))
+  )
+  cases <- list(
+    equal = list(obj = wide, target = rnorm(50L)),
+    unequal = list(obj = wide, target = rnorm(17L)),
+    one.column = list(obj = wide[, 1L, drop = FALSE], target = rnorm(5L))
+  )
+  fns <- list(
+    quantile_norm = quantile_norm,
+    quantile_norm_fixed = quantile_norm_fixed,
+    qnorm_target_rows_cpp = qnorm_target_rows_cpp
+  )
+
+  for (case in names(cases)) {
+    obj <- cases[[case]][["obj"]]
+    target <- cases[[case]][["target"]]
+    obj.saved <- unserialize(serialize(obj, NULL))
+    target.saved <- unserialize(serialize(target, NULL))
+    for (fn in names(fns)) {
+      info <- paste(case, fn)
+      out <- fns[[fn]](obj, target)
+      expect_identical(obj, obj.saved, info = info)
+      expect_identical(target, target.saved, info = info)
+      # And the result is a new matrix, not obj handed back.
+      expect_false(identical(out, obj.saved), info = info)
+    }
+  }
+})

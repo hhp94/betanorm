@@ -153,6 +153,11 @@ rebuild (`pkgbuild::clean_dll()`) first, or compare against
 
 ## 2026-10-05 — Kernel hardening taken back from the downstream (partly)
 
+Amended 2026-10-21 by the quantile-kernel entry below (0.1.5): item 3's
+order is a strict weak ordering with NaN last (NaNs are equivalent to one
+another), not a total order, and the target sort now uses it too. The
+rest stands.
+
 The downstream package vendors these kernels and on 2026-08-10 ran a
 memory-safety audit over them. Taken back here, all bit-identical, none
 reachable from the exported functions:
@@ -228,6 +233,11 @@ built the same way, and 0.1.1 itself is identical at -O2 and -O3.
 Snapshots unchanged throughout.
 
 ## 2026-10-20 — Code review, chunk 1: quantile_norm
+
+Amended 2026-10-21 by the quantile-kernel entry below (0.1.5): the two
+transposes are gone, since the downstream runs the kernel at EPIC scale;
+rows are read and written in place, with the same results. The rest
+stands.
 
 The first `/code-review` (`high`) of `R/quantile_norm.R` and
 `src/quantile_norm.cpp`; findings and dispositions in `dev/code-review.md`.
@@ -1139,6 +1149,70 @@ unchanged.
 
 Known: a gold removed from `FIXED_GOLD` leaves its file behind. The
 script does not delete it, and the test fails until it is removed.
+
+## 2026-10-21 — The quantile kernel: NaN-last target sort, rows in place, reciprocal kept (0.1.5)
+
+An outside review of `qnorm_target_rows_cpp()`, written without the R
+side, checked against the code, against preprocessCore's `qnorm.c`
+(`dev/preprocessCore/`) and against preprocessCore itself, installed.
+These changes go into 0.1.5 with the "used as they are" entry above; no
+second version bump (user).
+
+- **The target sort orders NaN last.** `std::sort` with a bare `<` on a
+  target holding NaN is UB, as it was for `DataItem` (2026-10-05, item
+  3). Measured: it left `c(0.3, NaN, 0.1, 0.2)` as `0.1, 0.3, NaN, 0.2`,
+  and a 122-value target with two NaNs unsorted, so every row mapped out
+  of rank order. 3000 random sorts did not crash, which proves nothing
+  about UB. Only a direct call reaches it: both R entry points refuse
+  NaN, NA and Inf in `target`. Not taken: the review's `Rcpp::stop()` on
+  NaN, which would make the C++ a second owner of a check R owns
+  (2026-08-10, "one owner per invariant"). One `less_nan_last()` now
+  orders both sorts, and for NaN-free input every comparison is the one
+  made before. Its comment calls it a strict weak ordering, not a total
+  order: NaNs are equivalent to one another, as -0 is to 0.
+  `test-cpp-contract.R` pins the target case, which fails on the old
+  code.
+- **Rows are read and written in place.** This replaces the two full
+  transposes that chunk 1 kept "until memory is shown to bind": the
+  downstream runs `quantile_norm_fixed()` at EPIC scale and above (user).
+  Each row is gathered from `obj`, `nrow(obj)` apart, into the items
+  buffer and sorted, and each tie group's value is scattered to the same
+  row of the result, allocated with `no_init` since every cell is written.
+  Measured with both kernels built alike by `sourceCpp()` (-O3 here,
+  from `~/.R/Makevars.win`): `identical()`, and bitwise by `serialize()`,
+  in 8167 cases (equal and unequal lengths, ties, integer `obj`, one row,
+  one column, a length-1 target, named dimnames, empty dimensions,
+  30 x 450k). Allocation fell from 687 to 343 MB on 100 x 450k and from
+  153 to 76 MB on 500 x 20k: one `obj`-sized matrix instead of two, so
+  the peak with `obj` is 2x instead of 3x. Time went from 4.64 to 4.48 s
+  and from 0.74 to 0.71 s. Under `load_all()` the in-place form first
+  looked 3 to 6 times faster; that was the -O0 build (2026-08-10, "Profile
+  with an -O2 DLL"). `test-input-preserved.R` now pins that
+  `quantile_norm()`, `quantile_norm_fixed()` and the kernel each leave
+  `obj` and `target` as found, on every path (user), and
+  `test-cpp-contract.R` that the kernel keeps an empty `obj`'s shape.
+- **The reciprocal is kept** (user). The unequal-length path multiplies
+  `rank - 1` by `1 / (n - 1)`, where preprocessCore divides. Measured
+  against preprocessCore on 84 cases (n from 2 to 20000, m from 1 to
+  30001, with and without ties): 42 cases differ, in 160,964 of 1,178,856
+  values (14%), by up to 6.8e-13 on rnorm targets, more as m grows. A
+  copy that divides matches preprocessCore bit for bit in all 84. The
+  equal-length path matches, and so does n = 2 or 3, where 1 / (n - 1) is
+  exact. The reciprocal dates from 2026-07-18, before the snapshots
+  (2026-08-10), so they pin it, and dividing would move betanorm's own
+  results in their last digits: a numerics change. A comment at the
+  hoisted constants says so, in the copied file.
+- **Not taken from the review.** An explicit empty path: R refuses empty
+  input, and the kernel is defined on it. Shortcuts for a length-1 target
+  or a single variable: degenerate inputs, more branches in a copied
+  file, and a minimum scan in place of the sort could change the sign of
+  a zero. A prepared-target interface: nothing reuses a target. Another
+  midpoint than `0.5 * (a + b)`: a tie at `DBL_MAX` gives `Inf`, as in
+  preprocessCore. The Inf policy was already set: `obj` and `target` must
+  be finite, and R owns that.
+
+Not run: sanitizers. mingw has none; rhub's clang-asan and clang-ubsan
+containers would be the way.
 
 ## 2026-09-25 — GPL (>= 3), with the upstream authors as `cph` (0.1.0)
 

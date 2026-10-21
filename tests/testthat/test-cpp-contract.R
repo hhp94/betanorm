@@ -318,3 +318,27 @@ test_that("qnorm_target_rows_cpp orders NaN last instead of invoking UB", {
   expect_identical(out[1L, ], c(0.8, 0.2))
   expect_identical(out[2L, ], c(0.8, 0.2))
 })
+
+test_that("qnorm_target_rows_cpp sorts a target holding NaN, NaN last", {
+  # quantile_norm() rejects NaN in target too. With a bare `<`, std::sort
+  # left this target as 0.1, 0.3, NaN, 0.2 (UB), so ranks mapped onto it out
+  # of order. With NaN last, the finite values keep their order and the top
+  # rank takes the NaN.
+  obj <- rbind(c(4, 3, 2, 1), c(1, 2, 3, 4))
+  expect_identical(
+    qnorm_target_rows_cpp(obj, c(0.3, NaN, 0.1, 0.2)),
+    rbind(c(NaN, 0.3, 0.2, 0.1), c(0.1, 0.2, 0.3, NaN))
+  )
+})
+
+test_that("qnorm_target_rows_cpp keeps an empty obj's shape", {
+  # quantile_norm() refuses empty input; the kernel stays defined on it.
+  expect_identical(
+    qnorm_target_rows_cpp(matrix(numeric(0L), 0L, 3L), c(0.2, 0.8)),
+    matrix(numeric(0L), 0L, 3L)
+  )
+  expect_identical(
+    qnorm_target_rows_cpp(matrix(numeric(0L), 2L, 0L), c(0.2, 0.8)),
+    matrix(numeric(0L), 2L, 0L)
+  )
+})

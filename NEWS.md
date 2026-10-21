@@ -13,6 +13,16 @@
   `data-raw/fixed_qtable_<gold>.rds`, and `FIXED_QTABLE` in
   `R/sysdata.rda` is built from those files. Its value is unchanged, and
   so are all results.
+* `quantile_norm()` and the internal `quantile_norm_fixed()` allocate one
+  matrix the size of `obj` instead of two: each sample's row is read and
+  written in place, with no transposed copy. On 100 samples by 450,000
+  probes that is 343 MB instead of 687 MB, at the same speed. The results
+  are unchanged, bit for bit.
+* The internal quantile kernel sorts `target` with `NaN` last, as it
+  already sorted the values of `obj`. A plain sort with `NaN` present is
+  undefined behaviour, and could leave the target out of order.
+  `quantile_norm()` refuses `NaN` in `target` before the kernel sees it,
+  so its results are unchanged.
 
 # betanorm 0.1.4
 
