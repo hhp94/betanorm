@@ -986,7 +986,7 @@ Known: regenerating the gold still goes through R's generator
 numbers stay the contract, as with `std::lgamma` (the one-file entry
 above).
 
-## 2026-10-21 — The E-step takes one `log` per 256 values (0.1.3, deliberate numerics change)
+## 2026-10-21 — The E-step takes one `log` per 256 values (0.1.4, deliberate numerics change)
 
 Asked by the user after the fixed path's profile. Each sample took 20.4 ms
 (installed -O2, sample 1 of the six EPIC samples):
