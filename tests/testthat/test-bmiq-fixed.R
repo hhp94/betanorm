@@ -1,13 +1,51 @@
 # bmiq_calibration_fixed() is bmiq_calibration() at its defaults with a
-# built-in gold fit, and its output is pinned to it within 1e-14: the gold
-# side of its quantile map is a precomputed table (FIXED_QTABLE, written to
-# R/sysdata.rda by data-raw/bmiq_gold_qtable.R), not stats::qbeta(), so the
-# two are not bit-identical. The stored gold numbers are pinned to the live
-# bmiq_gold_fit() bit for bit, and the table is pinned to the gold shapes
-# and to stats::qbeta() directly.
+# built-in gold fit, except that every value is fitted where the general
+# function fits a random subset of nfit. The stored gold numbers are
+# bmiq_gold_fit() with nfit at the gold's length, pinned to the live fit bit
+# for bit. Each sample is fitted on every value, in order, with no draw; the
+# general function fits a sample the same way with nfit above its length
+# and its draw replaced by the identity (local_fit_all_values()). So run,
+# against the stored gold, the output is pinned to bmiq_calibration() within
+# 1e-14: the gold side of its quantile map is a precomputed table
+# (FIXED_QTABLE, written to R/sysdata.rda by data-raw/bmiq_gold_qtable.R),
+# not stats::qbeta(), so the two are not bit-identical. The table is pinned
+# to the gold shapes and to stats::qbeta() directly.
 
 horvath_vector <- function() {
   betanorm::horvath_goldstandard[["goldstandard2"]]
+}
+
+# The fit FIXED_GOLD stores (data-raw/bmiq_gold_fixed.R).
+horvath_fit <- function() {
+  gold <- horvath_vector()
+  bmiq_gold_fit(gold, nL = 3L, nfit = length(gold), verbose = FALSE)
+}
+
+# With nfit at least the length, draw_fit_indices() returns every index; the
+# identity puts them in order.
+local_fit_all_values <- function(env = parent.frame()) {
+  local_mocked_bindings(
+    draw_fit_indices = function(n, size, seed) {
+      stopifnot(size == n)
+      seq_len(n)
+    },
+    .package = "betanorm",
+    .env = env
+  )
+}
+
+# bmiq_calibration() against the stored gold's fit, fitting each sample as
+# the fixed path does. The gold is fitted before the draw is replaced.
+general_all_values <- function(datM, ...) {
+  gold <- horvath_fit()
+  local_fit_all_values()
+  bmiq_calibration(
+    datM,
+    gold,
+    nfit = .Machine$integer.max,
+    verbose = FALSE,
+    ...
+  )
 }
 
 # GPL21145_sample without the 1062 gold-standard probes the EPIC array does
@@ -52,8 +90,8 @@ sweep_p <- function(half) {
   )))
 }
 
-test_that("the stored Horvath gold fit is the live bmiq_gold_fit()", {
-  live <- bmiq_gold_fit(horvath_vector(), nL = 3L, verbose = FALSE)
+test_that("the stored Horvath gold fit is the live bmiq_gold_fit() of every value", {
+  live <- horvath_fit()
   stored <- betanorm:::FIXED_GOLD[["horvath"]]
 
   expect_identical(names(betanorm:::FIXED_GOLD), "horvath")
@@ -152,7 +190,7 @@ test_that("an element the table cannot place falls back to stats::qbeta", {
 test_that("bmiq_calibration_fixed reproduces bmiq_calibration on real data", {
   datM <- epic_measured()
 
-  general <- bmiq_calibration(datM, horvath_vector(), verbose = FALSE)
+  general <- general_all_values(datM)
   fixed <- bmiq_calibration_fixed(datM)
 
   expect_true(all(general$success))
@@ -166,12 +204,7 @@ test_that("the table reproduces stats::qbeta on the real gold-side inputs", {
   datM <- epic_measured()
   gold <- betanorm:::FIXED_GOLD[["horvath"]]
   qtable <- FIXED_QTABLE[["horvath"]]
-  result <- bmiq_calibration(
-    datM,
-    horvath_vector(),
-    debug = TRUE,
-    verbose = FALSE
-  )
+  result <- general_all_values(datM, debug = TRUE)
 
   evaluations <- 0L
   for (i in seq_len(nrow(datM))) {
@@ -225,7 +258,7 @@ test_that("bmiq_calibration_fixed reproduces bmiq_calibration across blocks", {
   ))
   rownames(datM) <- paste0("s", seq_len(n_samples))
 
-  general <- bmiq_calibration(datM, horvath_vector(), verbose = FALSE)
+  general <- general_all_values(datM)
   fixed <- bmiq_calibration_fixed(datM)
 
   expect_true(all(general$success))
@@ -272,8 +305,8 @@ test_that("a skipped H step matches bmiq_calibration's optional policy", {
   real_fixed <- fixed_fit_mixture
   local_mocked_bindings(
     fit_mixture = mock_h_failure(fit_mixture),
-    fixed_fit_mixture = function(beta, thresholds, fit.idx) {
-      fit <- real_fixed(beta, thresholds, fit.idx)
+    fixed_fit_mixture = function(beta, thresholds) {
+      fit <- real_fixed(beta, thresholds)
       fit$mu <- c(0.15, 0.5, 1.5)
       fit
     },
@@ -282,11 +315,7 @@ test_that("a skipped H step matches bmiq_calibration's optional policy", {
 
   inputs <- make_calibration_inputs(n_probes = 1500L, seed = 11L)
 
-  general <- suppressWarnings(bmiq_calibration(
-    inputs$datM,
-    horvath_vector(),
-    verbose = FALSE
-  ))
+  general <- suppressWarnings(general_all_values(inputs$datM))
   expect_false(general$h.applied[1L])
 
   expect_warning(
@@ -359,11 +388,9 @@ test_that("a failed sample becomes an NA row and the others proceed", {
   expect_true(all(is.na(fixed[2L, ])))
   expect_false(anyNA(fixed[c(1L, 3L), ]))
 
-  general <- suppressWarnings(bmiq_calibration(
+  general <- suppressWarnings(general_all_values(
     datM,
-    horvath_vector(),
-    on.sample.error = "continue",
-    verbose = FALSE
+    on.sample.error = "continue"
   ))
   expect_identical(general$success, c(TRUE, FALSE, TRUE))
   expect_within_pin(fixed, general$calibrated)
@@ -373,7 +400,9 @@ test_that("a failed sample becomes an NA row and the others proceed", {
   expect_length(warnings, 1L)
 })
 
-test_that("bmiq_calibration_fixed leaves the random state as found", {
+test_that("bmiq_calibration_fixed draws no random number", {
+  # A draw would create a .Random.seed in a session with none, or move the
+  # one that was set.
   inputs <- make_calibration_inputs(n_probes = 500L, seed = 3L)
 
   expect_random_state_kept(function() {

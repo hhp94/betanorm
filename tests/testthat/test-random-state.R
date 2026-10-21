@@ -118,8 +118,7 @@ test_that("a session with no .Random.seed keeps its RNG kind", {
     },
     bmiq_gold_fit = function() {
       bmiq_gold_fit(inputs$gold, nfit = 500L, verbose = FALSE)
-    },
-    bmiq_calibration_fixed = function() bmiq_calibration_fixed(inputs$datM)
+    }
   )
   kinds <- list(
     c("L'Ecuyer-CMRG", "Inversion", "Rejection"),

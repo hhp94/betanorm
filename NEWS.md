@@ -3,21 +3,24 @@
 * New internal `bmiq_calibration_fixed()`, not exported:
   `bmiq_calibration()` at its defaults (the legacy three-state
   configuration) against a built-in gold-standard fit chosen by name, for
-  pipelines that copy the code. `gold = "horvath"` is the fit of
-  `horvath_goldstandard$goldstandard2`, so nothing is refitted for the
-  gold. It takes `datM` and `gold` and returns the calibrated matrix. A
+  pipelines that copy the code. It fits every value instead of a random
+  subset of 20000, so it draws no random numbers: `gold = "horvath"` is
+  the fit of all 21,368 values of `horvath_goldstandard$goldstandard2`,
+  stored so nothing is refitted for the gold, and each sample is fitted on
+  all of its probes. It takes `datM` and `gold` and returns the calibrated
+  matrix. A
   sample that cannot be calibrated becomes a row of `NA`; one warning says
   that some samples did, another that some ran without H. Above 200
   samples it reports progress on one line, in steps of 20%.
 * The gold side of its quantile map reads a table of the gold quantiles
   (quintic Hermite on 8192 nodes in log p, within 1e-14 of
   `stats::qbeta()`), built ahead of time and stored with the package, in
-  place of `stats::qbeta()`. Its output therefore agrees with the
-  `calibrated` element of
-  `bmiq_calibration(datM, horvath_goldstandard$goldstandard2, on.sample.error = "continue")`
-  to within 1e-14, not bit for bit. On the six EPIC samples it takes
-  0.12 s against 0.29 s for `bmiq_calibration()`, which still calls
-  `stats::qbeta()` and is unchanged.
+  place of `stats::qbeta()`, which adds at most 1e-14. Because it fits
+  every value, its output differs from that of
+  `bmiq_calibration(datM, horvath_goldstandard$goldstandard2)`, which fits
+  a random subset, by up to 9e-4 on the six EPIC samples. On those samples
+  it takes 0.12 s against 0.29 s for `bmiq_calibration()`, which still
+  calls `stats::qbeta()` and is unchanged.
 * Its source file and the stored table (`FIXED_QTABLE` in
   `R/sysdata.rda`) stand alone.
 * `bmiq_calibration()` and `bmiq_gold_fit()` keep the session's

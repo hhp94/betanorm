@@ -9,6 +9,8 @@
 ## Each value is written as a hexadecimal floating-point literal, which R
 ## parses exactly on every platform (its decimal parser is not correctly
 ## rounded on all of them), with the 17-digit decimal beside it to read.
+##
+## The gold is fitted on every value: nfit is the vector's length.
 devtools::load_all(".", quiet = TRUE)
 
 gold.sets <- list(
@@ -40,9 +42,10 @@ scalar_line <- function(name, x, indent, last = FALSE) {
 
 lines <- "FIXED_GOLD <- list("
 for (set in names(gold.sets)) {
-  fit <- bmiq_gold_fit(gold.sets[[set]], nL = 3L, verbose = FALSE)
+  gold <- gold.sets[[set]]
+  fit <- bmiq_gold_fit(gold, nL = 3L, nfit = length(gold), verbose = FALSE)
   stopifnot(
-    identical(fit[["settings"]][["nfit"]], 20000L),
+    identical(fit[["settings"]][["nfit"]], 21368L),
     identical(fit[["settings"]][["niter"]], 5L),
     identical(fit[["settings"]][["th1.v"]], c(0.2, 0.75))
   )

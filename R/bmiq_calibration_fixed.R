@@ -2,10 +2,10 @@
 # Teschendorff's BMIQ v1.2), whose EM is modified from RPMM (Houseman and
 # Koestler, GPL >= 2). GPL (>= 3) here; see inst/COPYRIGHTS.
 
-# bmiq_calibration() at the legacy configuration against a built-in gold fit.
-# Rationale: betanorm's dev/DECISIONS.md.
+# bmiq_calibration() at the legacy configuration against a built-in gold fit,
+# fitting every value instead of a random subset. Rationale: betanorm's
+# dev/DECISIONS.md.
 
-FIXED_NFIT <- 20000L
 FIXED_NITER <- 5L
 FIXED_TOL <- 0.001
 FIXED_BETA_MAXIT <- 50L
@@ -13,25 +13,26 @@ FIXED_BETA_SCORE_TOL <- 1e-10
 FIXED_MODE_WINDOW_LOW <- 0.4
 FIXED_MODE_WINDOW_HIGH <- 0.6
 
-# bmiq_gold_fit() of each gold vector, written by data-raw/bmiq_gold_fixed.R.
+# bmiq_gold_fit() of each gold vector with nfit at its length, written by
+# data-raw/bmiq_gold_fixed.R.
 # horvath: horvath_goldstandard[["goldstandard2"]] (Horvath 2013).
 FIXED_GOLD <- list(
   horvath = list(
     a = c(
-      0x1.280b80329a07fp+1, # 2.3128509757116826
-      0x1.f1ae1ff450641p+0, # 1.9440631839246552
-      0x1.cfa405d4f181cp+3 # 14.488772312073756
+      0x1.26c84d67fae6ap+1, # 2.302987743159794
+      0x1.efe9694136734p+0, # 1.9371553215227779
+      0x1.cb03b492cf27cp+3 # 14.344202315079421
     ),
     b = c(
-      0x1.321f91f333b22p+5, # 38.265415096297389
-      0x1.1c24ec6423668p+1, # 2.2198768128353557
-      0x1.6077f690e4582p+1 # 2.7536609847526856
+      0x1.31b22bd7139bp+5, # 38.211997680936634
+      0x1.1a89fe4786af5p+1, # 2.2073362206696125
+      0x1.5c6ed041d7eadp+1 # 2.7221317597867114
     ),
     thresholds = c(
-      0x1.6c635fe8efd87p-3, # 0.17792391709916108
-      0x1.66e53f652f122p-1 # 0.7009677706733195
+      0x1.6c71421f60fadp-3, # 0.17795039804707127
+      0x1.66f53872391b2p-1 # 0.70108963388752543
     ),
-    unmethylated.mode = 0x1.e295d00893456p-6, # 0.02945466342707833
+    unmethylated.mode = 0x1.e2a7a87660432p-6, # 0.029458918108051964
     methylated.mode = 0x1.bde9e34ffc3ffp-1 # 0.87092504836448359
   )
 )
@@ -140,52 +141,15 @@ fixed_estimate_mode <- function(x) {
   min(1, max(0, mode))
 }
 
-# Draws under R's default generator and restores the caller's random state.
-fixed_draw_fit_indices <- function(n, size, seed) {
-  has.seed <- exists(".Random.seed", envir = globalenv(), inherits = FALSE)
-  if (has.seed) {
-    saved.seed <- get(".Random.seed", envir = globalenv(), inherits = FALSE)
-    on.exit(
-      assign(".Random.seed", saved.seed, envir = globalenv()),
-      add = TRUE
-    )
-  } else {
-    # No seed to restore: put the kind back, then remove the seed it writes.
-    saved.kind <- RNGkind()
-    on.exit(
-      {
-        suppressWarnings(RNGkind(
-          kind = saved.kind[[1L]],
-          normal.kind = saved.kind[[2L]],
-          sample.kind = saved.kind[[3L]]
-        ))
-        if (exists(".Random.seed", envir = globalenv(), inherits = FALSE)) {
-          rm(".Random.seed", envir = globalenv())
-        }
-      },
-      add = TRUE
-    )
-  }
-  set.seed(
-    seed,
-    kind = "Mersenne-Twister",
-    normal.kind = "Inversion",
-    sample.kind = "Rejection"
-  )
-  sample.int(n, size, replace = FALSE)
-}
-
-# Fits the mixture to beta[fit.idx] and classes every value of beta.
-fixed_fit_mixture <- function(beta, thresholds, fit.idx) {
-  beta.fit <- as.numeric(beta[fit.idx])
-
-  initial.class <- fixed_class_by_thresh(beta.fit, thresholds)
+# Fits the mixture to every value of beta, in order, and classes them.
+fixed_fit_mixture <- function(beta, thresholds) {
+  initial.class <- fixed_class_by_thresh(beta, thresholds)
   fixed_require_all_classes(initial.class, min.count = 2L)
 
-  w.init <- matrix(0, nrow = length(fit.idx), ncol = 3L)
-  w.init[cbind(seq_along(fit.idx), initial.class)] <- 1
+  w.init <- matrix(0, nrow = length(beta), ncol = 3L)
+  w.init[cbind(seq_along(beta), initial.class)] <- 1
 
-  y_fit <- beta.fit
+  y_fit <- beta
   endpoint.eps <- sqrt(.Machine[["double.eps"]])
   positive <- y_fit[y_fit > 0]
   below.one <- y_fit[y_fit < 1]
@@ -347,8 +311,9 @@ fixed_map_beta_q <- function(x, a.sample, b.sample, gold.table, lower.tail) {
 #' Calibrate beta values to a built-in gold standard
 #'
 #' `bmiq_calibration()` at the legacy configuration (`nL = 3` with H,
-#' `niter = 5`, `nfit = 20000`) against a built-in gold-standard fit. A
-#' sample that cannot be calibrated becomes a row of `NA`.
+#' `niter = 5`) against a built-in gold-standard fit, with every value of
+#' the gold and of each sample fitted instead of a random subset of 20000.
+#' A sample that cannot be calibrated becomes a row of `NA`.
 #'
 #' @param datM Double matrix of beta values in \eqn{[0, 1]}, samples in rows.
 #' @param gold Name of the built-in gold standard.
@@ -397,12 +362,6 @@ bmiq_calibration_fixed <- function(datM, gold = "horvath") {
   h.applied <- rep.int(FALSE, number.of.samples)
   failed <- rep.int(FALSE, number.of.samples)
 
-  sample.fit.idx <- fixed_draw_fit_indices(
-    number.of.probes,
-    min(FIXED_NFIT, number.of.probes),
-    seed = 1L
-  )
-
   process_sample <- function(beta2.v) {
     mod2U <- fixed_estimate_mode(beta2.v[beta2.v < FIXED_MODE_WINDOW_LOW])
     mod2M <- fixed_estimate_mode(beta2.v[beta2.v > FIXED_MODE_WINDOW_HIGH])
@@ -419,8 +378,7 @@ bmiq_calibration_fixed <- function(datM, gold = "horvath") {
 
     sample.fit <- fixed_fit_mixture(
       beta = beta2.v,
-      thresholds = th2.initial,
-      fit.idx = sample.fit.idx
+      thresholds = th2.initial
     )
     a2 <- sample.fit[["a"]]
     b2 <- sample.fit[["b"]]

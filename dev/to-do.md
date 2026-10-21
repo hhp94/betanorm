@@ -20,7 +20,9 @@ What touches the input values today:
   two temporary vectors (`positive`, `below.one`). The fit subset
   (`sample.fit.idx`) is the same for every sample, so these two numbers
   per sample could come out of the up-front scan. Min and max are exact,
-  so this would be bit-identical.
+  so this would be bit-identical. In `bmiq_calibration_fixed()` the fit
+  is every value (2026-10-21), so the two are each row's own smallest
+  value above 0 and largest below 1.
 - `debug = TRUE`: `range(beta2.v)` per sample, another pass over the whole
   sample (`input_range` in the diagnostics).
 - The gold vector, when raw: `as.numeric()` copy, `assert_numeric()`, then

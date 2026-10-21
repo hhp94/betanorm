@@ -425,7 +425,10 @@ Amended the same day by the gold quantile table entry below: the gold
 side of `map_beta_q` now reads a table, and the output pin is 1e-14, not
 `identical()`. Amended again by the "internal, quiet" entry below: the
 function is not exported, has no `verbose`, and its warnings no longer
-name samples or errors. The rest stands.
+name samples or errors. Amended on 2026-10-21 by the "fits every value"
+entry below: no `nfit` and no draw in the file, the stored gold is
+fitted on every value, and the output pin runs `bmiq_calibration()` with
+each sample fitted on every value, in order. The rest stands.
 
 `R/bmiq_calibration_fixed.R` is `bmiq_calibration()` cut to the Horvath
 legacy configuration, for the downstream package to vendor in place of
@@ -485,7 +488,9 @@ Amended the same day by the stored table entry below: the table is
 built ahead of time into `R/sysdata.rda`, and the **API** paragraph
 (the `qtable` argument, the exported builder, the passed-table checks)
 is superseded. The table itself, the contract and the measurements
-stand.
+stand; since 2026-10-21 the general function in the contract is run
+against the stored gold's fit, with each sample fitted on every value, in
+order ("fits every value" below).
 
 The gold side of the quantile map in `bmiq_calibration_fixed()` reads a
 precomputed table in place of `stats::qbeta()`; the sample side stays
@@ -720,7 +725,8 @@ want is a commit here. The file therefore carries as little as it can
     log-density ratio has at most one interior turning point, so cutting
     there brackets every sign change;
   - one fit subset is drawn for all samples (same probe count, `nfit` and
-    seed);
+    seed); moot since 2026-10-21, when the draw went ("fits every value"
+    below);
   - every U and M value goes to exactly one tail, so a value at the
     component mean is mapped too;
   - the H set is never empty (code review, chunk 3), and the H map is
@@ -741,6 +747,10 @@ than 200 samples gets (201 samples that fail at once), and mocks the
 fitter with its new signature.
 
 ## 2026-10-20 — The fit-subset draw also restores the RNG kind with no seed (0.1.3)
+
+Amended 2026-10-21: `fixed_draw_fit_indices()` went with the fixed
+path's draw ("fits every value" below), so the fix and its pin now cover
+`bmiq_calibration()` and `bmiq_gold_fit()` only.
 
 In both `draw_fit_indices()` and `fixed_draw_fit_indices()` (user,
 2026-10-20). The draw keeps its save-and-restore rather than the plain
@@ -907,6 +917,69 @@ page, the source the catch-all relies on for the example datasets.
 
 The downstream is referred to only as "the downstream" in this repository
 (user, 2026-10-21): betanorm is a separate project.
+
+## 2026-10-21 — `bmiq_calibration_fixed()` fits every value and draws nothing (0.1.3, deliberate numerics change)
+
+No random subset of 20000 any more (user, 2026-10-21). Both fits see
+every value:
+
+- **The gold.** `FIXED_GOLD` is
+  `bmiq_gold_fit(horvath_goldstandard$goldstandard2, nL = 3L, nfit = 21368L)`,
+  the vector's length, at the other defaults. `data-raw/bmiq_gold_fixed.R`
+  fits at `nfit = length(gold)` and checks 21368. The bits are the ones
+  the user gave, which betanorm 0.1.1 (`7f202c1`) gives for the same
+  call; the current EM gives them too, checked value by value before
+  pasting. At `nfit = n` the general function still draws, a seed-1
+  permutation of all values, so the stored gold is that permutation's
+  fit; the draw happens in data-raw, and the stored numbers carry none of
+  it. `horvath_goldstandard` is untouched: a few of its values differ in
+  the last bit from the downstream's parse of the same CSV, and the fit
+  comes out the same bits either way (user).
+- **The samples.** Each sample's mixture is fitted on every value of its
+  row, in column order: up to the gold's 21,368 for a `datM` aligned to
+  it, 20,306 for the six EPIC samples. In order, not permuted, so nothing
+  is drawn.
+
+With no draw the function is deterministic without a seed. Gone:
+`FIXED_NFIT`, `fixed_draw_fit_indices()` with its save-and-restore of the
+random state and kind, and the `fit.idx` argument of
+`fixed_fit_mixture()`; nothing in the file touches the generator. The
+order is not cosmetic: the EM's sums depend on it, and fitting each
+sample on all its values in a seed-1 permutation instead of in order
+moves the output by up to 2.4e-8.
+
+`FIXED_QTABLE` was rebuilt by `data-raw/bmiq_gold_qtable.R` for the new
+shapes, which moved by up to 1.1% from the 20000-subset fit (a3 14.489 to
+14.344, b3 2.754 to 2.722); the thresholds moved by 1.2e-4 at most, the
+unmethylated mode by 4e-6, and the methylated mode not at all. It is
+another 1.08 MB blob in history. The downstream takes the file and the
+table together at its next pin.
+
+**Pins** (`test-bmiq-fixed.R`). The stored gold is `identical()` to the
+live `bmiq_gold_fit()` at `nfit = length(gold)`. The output is held
+within 1e-14 of `bmiq_calibration()` given that fit as a prefit, with
+`nfit = .Machine$integer.max` and `draw_fit_indices()` replaced by the
+identity (`local_fit_all_values()`, which also checks that every index is
+asked for), so the general function fits each sample as the fixed path
+does: 3.3e-16 on the six EPIC samples, 41.2% bit-identical. The pin tells
+the orders apart: the general function's permutation of all values
+misses by 2.4e-8, its default 20000 subset by 8.9e-4. The random-state
+test becomes "draws no random number" (a draw would create or move
+`.Random.seed`), and the RNG-kind test in `test-random-state.R` drops the
+fixed function: it has no draw to restore around. The general functions
+and the snapshots are unchanged.
+
+**Numbers.** Against the previous fixed output on the six EPIC samples:
+max-abs 8.9e-4, median 1.2e-4. A feature change under CLAUDE.md: NEWS and
+this entry. Time is as before, 118 ms fixed against 295 ms general
+(installed at -O2, `bench::mark` median of 15): the EM sees 20,306 values
+per sample instead of 20,000, and the per-call draw is gone.
+
+Known: regenerating the gold still goes through R's generator
+(Mersenne-Twister, seed 1, `sample.kind = "Rejection"`). A change in R's
+`sample.int()` would show as a failed `identical()` pin, and the stored
+numbers stay the contract, as with `std::lgamma` (the one-file entry
+above).
 
 ## 2026-09-25 — GPL (>= 3), with the upstream authors as `cph` (0.1.0)
 
