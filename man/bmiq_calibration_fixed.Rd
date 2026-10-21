@@ -40,8 +40,9 @@ normalization, \code{niter = 5}, \code{nfit = 20000}, \code{tol = 0.001},
 \code{beta.maxit = 50}, \code{beta.score.tol = 1e-10}, a skipped H step keeps the
 U-plus-upper-M calibration (\code{h.policy = "optional"}), and a failed sample
 becomes a row of \code{NA} (\code{on.sample.error = "continue"}). The output
-agrees with \verb{bmiq_calibration(datM, <gold vector>)} at its defaults to
-within 1e-14: the gold mixture is not refitted on each call, and the
+agrees with the \code{calibrated} element of
+\verb{bmiq_calibration(datM, <gold vector>, on.sample.error = "continue")}
+to within 1e-14: the gold mixture is not refitted on each call, and the
 gold side of the quantile map reads a precomputed table
 (\code{\link[=bmiq_gold_qtable]{bmiq_gold_qtable()}}) in place of \code{\link[stats:qbeta]{stats::qbeta()}}.
 }

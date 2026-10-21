@@ -30,14 +30,18 @@ Each component table holds two half-tables, for Beta(a, b) and
 Beta(b, a): the lower-tail quantile for p in \eqn{[10^{-30}, 1/2]} on
 8192 nodes uniform in \eqn{\log p}, stored as per-interval quintic
 Hermite coefficients of \eqn{\log x}. The reflection \eqn{x \to 1 - x}
-gives the upper tail and p above 1/2, p = 0 and 1 are exact, and p
-below \eqn{10^{-30}} falls back to \code{\link[stats:qbeta]{stats::qbeta()}}. Against
+gives the upper tail and p above 1/2, p = 0 and 1 are exact, and p at
+or below \eqn{10^{-30}} falls back to \code{\link[stats:qbeta]{stats::qbeta()}}. Against
 \code{stats::qbeta()} the interpolant is within 1e-14 on real inputs and a
 dense sweep. Building takes about 70 ms; a table is about 1.5 MB.
+
+A table passed to \code{\link[=bmiq_calibration_fixed]{bmiq_calibration_fixed()}} is checked for its layout,
+version, gold shapes and grid, and spot-checked against
+\code{stats::qbeta()} at sixteen interval midpoints per half-table.
 }
 \examples{
-qt <- bmiq_gold_qtable()
+qtable <- bmiq_gold_qtable()
 # Reuse it across calls:
-# lapply(matrices, bmiq_calibration_fixed, qtable = qt)
+# lapply(matrices, bmiq_calibration_fixed, qtable = qtable)
 
 }

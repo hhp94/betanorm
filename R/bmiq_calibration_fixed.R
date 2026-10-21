@@ -30,7 +30,8 @@ FIXED_MODE_WINDOW_HIGH <- 0.6
 # The gold quantile table (bmiq_gold_qtable()): one half-table is the
 # lower-tail quantile of a Beta(a, b) for p in [FIXED_QTABLE_P_MIN, 1/2] on
 # FIXED_QTABLE_N nodes uniform in u = log p. The version is a schema id for
-# tables a caller built earlier; bump it when the layout or the grid changes.
+# tables a caller built earlier; bump it whenever what a table holds
+# changes: the layout, the grid, or how the coefficients are built.
 FIXED_QTABLE_VERSION <- 1L
 FIXED_QTABLE_N <- 8192L
 FIXED_QTABLE_P_MIN <- 1e-30
@@ -355,16 +356,16 @@ fixed_fit_mixture <- function(beta, thresholds, fit.idx, context) {
 # analytic first and second derivatives of v in u. A component table is
 # two halves, Beta(a, b) and Beta(b, a): the reflection x -> 1 - x swaps the
 # shapes and the tails, so Q_upper(p; a, b) = 1 - Q(p; b, a), and p above
-# 1/2 is read as 1 - p from the swapped half. p = 0 and 1 are exact; p below
-# FIXED_QTABLE_P_MIN falls back to stats::qbeta. Measured against
+# 1/2 is read as 1 - p from the swapped half. p = 0 and 1 are exact; p at
+# or below FIXED_QTABLE_P_MIN falls back to stats::qbeta. Measured against
 # stats::qbeta on the EPIC inputs and a dense sweep: within 1e-14
 # (dev/qtable-exp.R, 2026-10-20).
 #
 # The grid is anchored at u1 = log(1/2): node i is u1 - (n - i) * h, and
 # fixed_eval_half() recomputes a node position with that same expression,
 # so build and evaluation agree on the nodes bit for bit. Nodes from seq()
-# reconstructed as u0 + i * h drift by up to 2.5e-11 at this grid size,
-# which put a 1e-12 floor under the interpolant.
+# reconstructed as u0 + i * h drifted by up to 2.5e-11 at n = 4096
+# (dev/qtable-exp.R), which put a 1e-12 floor under the interpolant.
 fixed_qtable_grid <- function() {
   n <- FIXED_QTABLE_N
   u1 <- log(0.5)
@@ -444,15 +445,19 @@ fixed_make_qtable <- function(a, b) {
 #' Beta(b, a): the lower-tail quantile for p in \eqn{[10^{-30}, 1/2]} on
 #' 8192 nodes uniform in \eqn{\log p}, stored as per-interval quintic
 #' Hermite coefficients of \eqn{\log x}. The reflection \eqn{x \to 1 - x}
-#' gives the upper tail and p above 1/2, p = 0 and 1 are exact, and p
-#' below \eqn{10^{-30}} falls back to [stats::qbeta()]. Against
+#' gives the upper tail and p above 1/2, p = 0 and 1 are exact, and p at
+#' or below \eqn{10^{-30}} falls back to [stats::qbeta()]. Against
 #' `stats::qbeta()` the interpolant is within 1e-14 on real inputs and a
 #' dense sweep. Building takes about 70 ms; a table is about 1.5 MB.
 #'
+#' A table passed to [bmiq_calibration_fixed()] is checked for its layout,
+#' version, gold shapes and grid, and spot-checked against
+#' `stats::qbeta()` at sixteen interval midpoints per half-table.
+#'
 #' @examples
-#' qt <- bmiq_gold_qtable()
+#' qtable <- bmiq_gold_qtable()
 #' # Reuse it across calls:
-#' # lapply(matrices, bmiq_calibration_fixed, qtable = qt)
+#' # lapply(matrices, bmiq_calibration_fixed, qtable = qtable)
 #'
 #' @export
 bmiq_gold_qtable <- function(gold = "horvath") {
@@ -469,7 +474,14 @@ bmiq_gold_qtable <- function(gold = "horvath") {
 # A table the caller built earlier can be stale or belong to another gold,
 # so a passed table is checked against what bmiq_gold_qtable() would build
 # now: schema version, gold name, every shape identical to FIXED_GOLD, the
-# grid constants, and finite coefficient vectors of the right length.
+# grid constants, and finite coefficient vectors of the right length. The
+# structure says nothing about the values, so each half is also evaluated
+# at FIXED_QTABLE_SPOT_CHECKS interval midpoints spread over the grid and
+# compared with stats::qbeta: a shifted, foreign or differently built set
+# of coefficients misses by far more than the 1e-12 allowed, while a table
+# built here (within 1e-14) or on another platform's Rmath passes.
+FIXED_QTABLE_SPOT_CHECKS <- 16L
+FIXED_QTABLE_SPOT_TOL <- 1e-12
 fixed_validate_qtable <- function(qtable, gold) {
   refuse <- function(...) {
     stop(
@@ -492,7 +504,11 @@ fixed_validate_qtable <- function(qtable, gold) {
     refuse("was built by another version of bmiq_gold_qtable()")
   }
   if (!identical(qtable[["gold"]], gold)) {
-    refuse("was built for gold \"", qtable[["gold"]], "\", not \"", gold, "\"")
+    built.for <- qtable[["gold"]]
+    if (is.character(built.for) && length(built.for) == 1L) {
+      refuse("was built for gold \"", built.for, "\", not \"", gold, "\"")
+    }
+    refuse("was not built for gold \"", gold, "\"")
   }
 
   grid <- fixed_qtable_grid()
@@ -531,6 +547,14 @@ fixed_validate_qtable <- function(qtable, gold) {
           " is not a finite double vector of length n - 1"
         )
       }
+    }
+    n <- grid[["n"]]
+    intervals <- round(seq(1, n - 1, length.out = FIXED_QTABLE_SPOT_CHECKS))
+    u.mid <- grid[["u1"]] - (n - intervals) * grid[["h"]] + grid[["h"]] / 2
+    x.table <- fixed_eval_half(u.mid, half)
+    x.rmath <- stats::qbeta(u.mid, a, b, log.p = TRUE)
+    if (!all(abs(x.table - x.rmath) <= FIXED_QTABLE_SPOT_TOL)) {
+      refuse(where, " does not reproduce stats::qbeta() for its shapes")
     }
   }
   check_component <- function(name, k) {
@@ -604,8 +628,8 @@ fixed_qbeta_table <- function(p, gold.table, lower.tail) {
   }
 
   # p at or below p.min on either side is Rmath's, as is any element the
-  # table did not place in [0, 1] (unreachable from a validated table, but
-  # a fallback rather than a clip).
+  # table did not place in [0, 1] (validation only spot-checks a passed
+  # table, so this is a fallback rather than a clip).
   fallback <- !(zero | one | small | big) | !is.finite(out) | out < 0 | out > 1
   if (any(fallback)) {
     out[fallback] <- stats::qbeta(
@@ -628,6 +652,21 @@ fixed_map_beta_q <- function(x, a.sample, b.sample, gold.table, lower.tail) {
   )
 }
 
+# The end-of-run warnings list the samples concerned. R prints at most
+# getOption("warning.length") characters of a warning (1000 by default),
+# so a long list is shortened here, to FIXED_WARNING_SAMPLES entries and a
+# count, rather than cut off there.
+FIXED_WARNING_SAMPLES <- 10L
+fixed_list_samples <- function(items, sep) {
+  if (length(items) > FIXED_WARNING_SAMPLES) {
+    items <- c(
+      items[seq_len(FIXED_WARNING_SAMPLES)],
+      paste("and", length(items) - FIXED_WARNING_SAMPLES, "more")
+    )
+  }
+  paste(items, collapse = sep)
+}
+
 #' Calibrate Beta Values to a Built-in Gold Standard (Legacy Configuration)
 #'
 #' [bmiq_calibration()] reduced to the legacy three-state BMIQ
@@ -637,8 +676,9 @@ fixed_map_beta_q <- function(x, a.sample, b.sample, gold.table, lower.tail) {
 #' `beta.maxit = 50`, `beta.score.tol = 1e-10`, a skipped H step keeps the
 #' U-plus-upper-M calibration (`h.policy = "optional"`), and a failed sample
 #' becomes a row of `NA` (`on.sample.error = "continue"`). The output
-#' agrees with `bmiq_calibration(datM, <gold vector>)` at its defaults to
-#' within 1e-14: the gold mixture is not refitted on each call, and the
+#' agrees with the `calibrated` element of
+#' `bmiq_calibration(datM, <gold vector>, on.sample.error = "continue")`
+#' to within 1e-14: the gold mixture is not refitted on each call, and the
 #' gold side of the quantile map reads a precomputed table
 #' ([bmiq_gold_qtable()]) in place of [stats::qbeta()].
 #'
@@ -976,12 +1016,14 @@ bmiq_calibration_fixed <- function(
     warning(
       length(failed.samples),
       " sample(s) failed BMIQ calibration and were replaced with NA rows: ",
-      paste0(
-        failed.samples,
-        " (",
-        failure.messages[failed.samples],
-        ")",
-        collapse = "; "
+      fixed_list_samples(
+        paste0(
+          failed.samples,
+          " (",
+          failure.messages[failed.samples],
+          ")"
+        ),
+        sep = "; "
       ),
       ".",
       call. = FALSE
@@ -993,7 +1035,7 @@ bmiq_calibration_fixed <- function(
     warning(
       length(skipped.h),
       " sample(s) calibrated without H (U plus upper-M): ",
-      paste(skipped.h, collapse = ", "),
+      fixed_list_samples(skipped.h, sep = ", "),
       ".",
       call. = FALSE
     )

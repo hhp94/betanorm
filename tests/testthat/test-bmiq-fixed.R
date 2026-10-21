@@ -25,10 +25,11 @@ expect_within_pin <- function(fixed, general) {
   expect_lte(max(abs(fixed - general), na.rm = TRUE), 1e-14)
 }
 
-# Dense p per (component, tail), as in dev/qtable-exp.R: grid nodes,
-# interval interiors at three offsets, their mirrors above 1/2, and the
-# boundary cases. p is built first and the log taken from it, as in
-# production.
+# Dense p per (component, tail), after dev/qtable-exp.R without its random
+# points: the grid nodes, three series of 20000 points spaced about 0.41 h
+# apart from different starting offsets (about seven points per interval),
+# their mirrors above 1/2, and the boundary cases. p is built first and
+# the log taken from it, as in production.
 sweep_p <- function(half) {
   eps <- .Machine$double.eps
   p.min <- FIXED_QTABLE_P_MIN
@@ -242,6 +243,8 @@ test_that("a malformed table is refused", {
   bad <- qtable
   bad$gold <- "other"
   refused(bad, "was built for gold \"other\", not \"horvath\"")
+  bad$gold <- sum
+  refused(bad, "was not built for gold \"horvath\"")
 
   bad <- qtable
   bad$version <- 0L
@@ -288,6 +291,39 @@ test_that("a malformed table is refused", {
   bad <- qtable
   bad$U$extra <- 1
   refused(bad, "\\$U is not a component table")
+
+  # Well-formed but wrong values: the structural checks pass, the spot
+  # check against stats::qbeta does not.
+  bad <- qtable
+  bad$U$ab$c0 <- bad$U$ab$c0 + 1e-9
+  refused(bad, "\\$U\\$ab does not reproduce stats::qbeta\\(\\)")
+  bad <- qtable
+  bad$M$ba$c3 <- 2 * bad$M$ba$c3
+  refused(bad, "\\$M\\$ba does not reproduce stats::qbeta\\(\\)")
+  bad <- qtable
+  foreign <- fixed_make_half(3, 30)
+  for (name in paste0("c", 0:5)) bad$M$ab[[name]] <- foreign[[name]]
+  refused(bad, "\\$M\\$ab does not reproduce stats::qbeta\\(\\)")
+})
+
+test_that("a table saved to disk and read back is accepted", {
+  inputs <- make_calibration_inputs(n_probes = 600L, seed = 3L)
+  path <- tempfile(fileext = ".rds")
+  on.exit(unlink(path))
+  saveRDS(bmiq_gold_qtable(), path)
+  expect_identical(
+    bmiq_calibration_fixed(inputs$datM, verbose = FALSE, qtable = readRDS(path)),
+    bmiq_calibration_fixed(inputs$datM, verbose = FALSE)
+  )
+})
+
+test_that("the end-of-run warnings list at most ten samples", {
+  expect_identical(fixed_list_samples(1:10, sep = ", "), paste(1:10, collapse = ", "))
+  expect_identical(
+    fixed_list_samples(1:12, sep = ", "),
+    paste(c(1:10, "and 2 more"), collapse = ", ")
+  )
+  expect_identical(fixed_list_samples(character(), sep = "; "), "")
 })
 
 test_that("a skipped H step matches bmiq_calibration's optional policy", {
