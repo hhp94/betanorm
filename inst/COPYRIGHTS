@@ -7,7 +7,8 @@ R/quantile_norm.R, src/quantile_norm.cpp
   copyright Ben Bolstad, LGPL (>= 2). Ported to a no-missing-data, row-wise
   form in C++. LGPL (>= 2) permits distribution under GPL (>= 3).
 
-src/bmiq_norm.cpp, R/bmiq_calibration.R (mixture fitting)
+src/bmiq_norm.cpp, R/bmiq_calibration.R and R/bmiq_calibration_fixed.R
+(mixture fitting)
   Derived from blc2 and betaEst2 in Steve Horvath's BMIQcalibration code,
   which are modified versions of blc and betaEst from RPMM, copyright
   E. Andres Houseman and Devin C. Koestler, GPL (>= 2). Horvath's edits come
@@ -16,7 +17,8 @@ src/bmiq_norm.cpp, R/bmiq_calibration.R (mixture fitting)
   doi:10.1186/gb-2013-14-10-r115, under CC BY 2.0. Rewritten in C++ with
   a Newton M-step, Armijo line search and fit-status reporting.
 
-R/bmiq_calibration.R (thresholds, class modes and quantile transformation)
+R/bmiq_calibration.R and R/bmiq_calibration_fixed.R (thresholds, class
+modes and quantile transformation)
   Derived from Steve Horvath's BMIQcalibration, his adaptation of Andrew
   Teschendorff's BMIQ v1.2 (Teschendorff et al. 2013). Horvath's version is
   the NORMALIZATION.R additional file published with Horvath S (2013),
@@ -24,6 +26,11 @@ R/bmiq_calibration.R (thresholds, class modes and quantile transformation)
   Teschendorff's BMIQ
   code is also distributed under GPL-3 in the Bioconductor packages ChAMP and
   wateRmelon, which GPL (>= 3) covers.
+
+FIXED_GOLD in R/bmiq_calibration_fixed.R, FIXED_QTABLE in R/sysdata.rda
+  Computed from the goldstandard2 column of horvath_goldstandard, from
+  Horvath S (2013), Genome Biology 14:R115, doi:10.1186/gb-2013-14-10-r115,
+  under CC BY 2.0: its fitted beta mixture and that fit's quantile table.
 
 Reference copies
   The source consulted during development is kept in the development

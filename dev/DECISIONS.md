@@ -151,12 +151,11 @@ profile or bench must set `options(pkg.build_extra_flags = FALSE)` and
 rebuild (`pkgbuild::clean_dll()`) first, or compare against
 `Rcpp::sourceCpp` output (which uses the standard -O2 Makeconf flags).
 
-## 2026-10-05 — Kernel hardening taken back from methylCIPHERv2 (partly)
+## 2026-10-05 — Kernel hardening taken back from the downstream (partly)
 
-methylCIPHERv2 vendors these kernels and on 2026-08-10 ran a memory-safety
-audit over them (its `dev/DECISIONS.md`, "The kernels bounds-check their own
-arguments"). Taken back here, all bit-identical, none reachable from the
-exported functions:
+The downstream package vendors these kernels and on 2026-08-10 ran a
+memory-safety audit over them. Taken back here, all bit-identical, none
+reachable from the exported functions:
 
 1. `gather_/scatter_sample_block_cpp`: block arithmetic in `R_xlen_t` with
    `NA_INTEGER` rejected first. In `int`, a large or `NA` `first_sample`
@@ -179,9 +178,9 @@ a second owner for arguments R already validates or defaults, against
 "validation lives in R; C++ trusts its caller". Revisit only if those
 arguments become reachable from user input.
 
-The other methylCIPHERv2 divergences (no RNG/`nfit`, prefit-only gold, no
-debug/verbose, per-sample value scan, no warnings) are downstream choices
-for its own front door and stay there.
+The downstream's other divergences (no RNG/`nfit`, prefit-only gold, no
+debug/verbose, per-sample value scan, no warnings) are its own choices for
+its front door and stay there.
 
 ## 2026-10-20 — The vendored files follow the downstream code rules (0.1.2)
 
@@ -892,6 +891,22 @@ there, but the `identical()` pin of the stored gold fit against a live
 `bmiq_gold_fit()` in `test-bmiq-fixed.R` does, and on another libm it is
 expected to fail (the one-file entry above). It would need
 `skip_on_cran()`.
+
+## 2026-10-21 — COPYRIGHTS covers the fixed file and its stored gold (0.1.3)
+
+`inst/COPYRIGHTS` named only `R/bmiq_calibration.R` in its two BMIQ
+entries, so `R/bmiq_calibration_fixed.R`, whose header points there, fell
+under the "copyright Hung Pham" catch-all. It carries the same derived
+code (the endpoint clip, the per-sample tail split, the quantile map and
+the H map, with BMIQcalibration's names), and a file reworked this far
+is still derived: what survives of the original, not how much changed,
+decides it. Both entries now name it. A third entry credits the source
+of `FIXED_GOLD` and `FIXED_QTABLE`, which are computed from
+`horvath_goldstandard` (CC BY 2.0) and travel without the dataset's help
+page, the source the catch-all relies on for the example datasets.
+
+The downstream is referred to only as "the downstream" in this repository
+(user, 2026-10-21): betanorm is a separate project.
 
 ## 2026-09-25 — GPL (>= 3), with the upstream authors as `cph` (0.1.0)
 
