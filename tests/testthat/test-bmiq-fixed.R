@@ -1,9 +1,10 @@
 # bmiq_calibration_fixed() is bmiq_calibration() at its defaults with a
 # built-in gold fit, and its output is pinned to it within 1e-14: the gold
-# side of its quantile map is a precomputed table (bmiq_gold_qtable()), not
-# stats::qbeta(), so the two are not bit-identical. The stored gold numbers
-# are pinned to the live bmiq_gold_fit() bit for bit, and the table is
-# pinned to stats::qbeta() directly.
+# side of its quantile map is a precomputed table (FIXED_QTABLE, written to
+# R/sysdata.rda by data-raw/bmiq_gold_qtable.R), not stats::qbeta(), so the
+# two are not bit-identical. The stored gold numbers are pinned to the live
+# bmiq_gold_fit() bit for bit, and the table is pinned to the gold shapes
+# and to stats::qbeta() directly.
 
 horvath_vector <- function() {
   betanorm::horvath_goldstandard[["goldstandard2"]]
@@ -32,7 +33,7 @@ expect_within_pin <- function(fixed, general) {
 # the log taken from it, as in production.
 sweep_p <- function(half) {
   eps <- .Machine$double.eps
-  p.min <- FIXED_QTABLE_P_MIN
+  p.min <- 1e-30
   u0 <- half$u0
   u1 <- half$u1
   h <- half$h
@@ -63,12 +64,36 @@ test_that("the stored Horvath gold fit is the live bmiq_gold_fit()", {
   expect_identical(stored$methylated.mode, live$methylated.mode)
 })
 
+test_that("the stored table is built for every gold set on the documented grid", {
+  expect_identical(names(FIXED_QTABLE), names(FIXED_GOLD))
+  half.names <- c("a", "b", "n", "u0", "u1", "h", paste0("c", 0:5))
+  for (gold in names(FIXED_GOLD)) {
+    qtable <- FIXED_QTABLE[[gold]]
+    # The shapes check every call makes.
+    expect_identical(fixed_gold_qtable(gold), qtable)
+    expect_identical(names(qtable), c("U", "M"))
+    for (component in c("U", "M")) {
+      expect_identical(names(qtable[[component]]), c("a", "b", "ab", "ba"))
+      for (name in c("ab", "ba")) {
+        half <- qtable[[component]][[name]]
+        expect_identical(names(half), half.names)
+        expect_identical(half$n, 8192L)
+        expect_identical(half$u1, log(0.5))
+        expect_identical(half$u0, half$u1 - (half$n - 1) * half$h)
+        expect_equal(exp(half$u0), 1e-30)
+        for (coefficient in paste0("c", 0:5)) {
+          expect_true(is.double(half[[coefficient]]))
+          expect_length(half[[coefficient]], half$n - 1L)
+          expect_true(all(is.finite(half[[coefficient]])))
+        }
+      }
+    }
+  }
+})
+
 test_that("the gold quantile table reproduces stats::qbeta for every gold set", {
   for (gold in names(FIXED_GOLD)) {
-    qtable <- bmiq_gold_qtable(gold)
-    expect_identical(names(qtable), c("version", "gold", "U", "M"))
-    expect_identical(qtable$version, FIXED_QTABLE_VERSION)
-    expect_identical(qtable$gold, gold)
+    qtable <- FIXED_QTABLE[[gold]]
 
     for (component in c("U", "M")) {
       ctab <- qtable[[component]]
@@ -78,7 +103,7 @@ test_that("the gold quantile table reproduces stats::qbeta for every gold set", 
         table <- fixed_qbeta_table(p, ctab, lower.tail)
         expect_lte(max(abs(table - reference)), 1e-14)
         # p = 0 and 1 are exact ends; p at or below p.min is Rmath's own.
-        ends <- p == 0 | p == 1 | p <= FIXED_QTABLE_P_MIN
+        ends <- p == 0 | p == 1 | log(p) <= ctab$ab$u0
         expect_identical(table[ends], reference[ends])
         # The ends of the sweep are the right ends.
         expect_identical(table[p == 0], if (lower.tail) 0 else 1)
@@ -92,7 +117,7 @@ test_that("the table evaluated at its nodes returns the node values", {
   # Build and evaluation must place the nodes with the same arithmetic;
   # nodes from seq() reconstructed as u0 + i * h put a 1e-12 floor under
   # the interpolant (dev/qtable-exp.R).
-  qtable <- bmiq_gold_qtable()
+  qtable <- FIXED_QTABLE[["horvath"]]
   for (component in c("U", "M")) {
     for (name in c("ab", "ba")) {
       half <- qtable[[component]][[name]]
@@ -108,7 +133,7 @@ test_that("the table evaluated at its nodes returns the node values", {
 })
 
 test_that("an element the table cannot place falls back to stats::qbeta", {
-  qtable <- bmiq_gold_qtable()
+  qtable <- FIXED_QTABLE[["horvath"]]
   half <- qtable$U$ab
   p <- exp(half$u1 - (half$n - 4000.5) * half$h) # inside interval 4000
   # p <= 1/2 reads the (a, b) half on the lower tail and the (b, a) half on
@@ -128,7 +153,7 @@ test_that("bmiq_calibration_fixed reproduces bmiq_calibration on real data", {
   datM <- epic_measured()
 
   general <- bmiq_calibration(datM, horvath_vector(), verbose = FALSE)
-  fixed <- bmiq_calibration_fixed(datM, verbose = FALSE)
+  fixed <- bmiq_calibration_fixed(datM)
 
   expect_true(all(general$success))
   expect_true(all(general$h.applied))
@@ -140,7 +165,7 @@ test_that("the table reproduces stats::qbeta on the real gold-side inputs", {
   # general function's diagnostics and compared with the table directly.
   datM <- epic_measured()
   gold <- betanorm:::FIXED_GOLD[["horvath"]]
-  qtable <- bmiq_gold_qtable()
+  qtable <- FIXED_QTABLE[["horvath"]]
   result <- bmiq_calibration(
     datM,
     horvath_vector(),
@@ -201,129 +226,43 @@ test_that("bmiq_calibration_fixed reproduces bmiq_calibration across blocks", {
   rownames(datM) <- paste0("s", seq_len(n_samples))
 
   general <- bmiq_calibration(datM, horvath_vector(), verbose = FALSE)
-  fixed <- bmiq_calibration_fixed(datM, verbose = FALSE)
+  fixed <- bmiq_calibration_fixed(datM)
 
   expect_true(all(general$success))
   expect_within_pin(fixed, general$calibrated)
 })
 
-test_that("a passed table equals a built one and gives identical output", {
+test_that("a stored table not built for the gold stops the call", {
+  # FIXED_QTABLE travels apart from the R file when vendored, so a table
+  # from another commit must not reach the quantile map.
   inputs <- make_calibration_inputs(n_probes = 600L, seed = 3L)
-  qtable <- bmiq_gold_qtable()
-
-  expect_identical(qtable, bmiq_gold_qtable("horvath"))
-  expect_identical(
-    bmiq_calibration_fixed(inputs$datM, verbose = FALSE, qtable = qtable),
-    bmiq_calibration_fixed(inputs$datM, verbose = FALSE)
-  )
-  # Positional calls written before qtable existed still work.
-  expect_identical(
-    bmiq_calibration_fixed(inputs$datM, "horvath", FALSE),
-    bmiq_calibration_fixed(inputs$datM, verbose = FALSE, qtable = qtable)
-  )
-})
-
-test_that("a malformed table is refused", {
-  inputs <- make_calibration_inputs(n_probes = 600L, seed = 3L)
-  datM <- inputs$datM
-  qtable <- bmiq_gold_qtable()
-  refused <- function(bad, regexp) {
+  stored <- FIXED_QTABLE
+  refused <- function(table) {
+    local_mocked_bindings(FIXED_QTABLE = table, .package = "betanorm")
     expect_error(
-      bmiq_calibration_fixed(datM, verbose = FALSE, qtable = bad),
-      regexp = paste0("qtable ", regexp, ".*bmiq_gold_qtable\\(\"horvath\"\\)")
+      bmiq_calibration_fixed(inputs$datM),
+      regexp = "FIXED_QTABLE does not match FIXED_GOLD"
     )
   }
 
-  expect_error(bmiq_gold_qtable("other"), regexp = "gold")
-  expect_error(bmiq_gold_qtable(1L), regexp = "gold")
+  bad <- stored
+  bad$horvath$U <- stored$horvath$M
+  bad$horvath$M <- stored$horvath$U
+  refused(bad)
 
-  refused(list(1), "is not a list")
-  refused(unclass(as.matrix(1)), "is not a list")
+  bad <- stored
+  bad$horvath$M$ab <- stored$horvath$M$ba
+  bad$horvath$M$ba <- stored$horvath$M$ab
+  refused(bad)
 
-  bad <- qtable
-  bad$gold <- "other"
-  refused(bad, "was built for gold \"other\", not \"horvath\"")
-  bad$gold <- sum
-  refused(bad, "was not built for gold \"horvath\"")
+  bad <- stored
+  bad$horvath$U$a <- stored$horvath$U$a * (1 + 1e-15)
+  refused(bad)
+  bad <- stored
+  bad$horvath$M$ba$b <- stored$horvath$M$ba$b * (1 + 1e-15)
+  refused(bad)
 
-  bad <- qtable
-  bad$version <- 0L
-  refused(bad, "was built by another version")
-  bad$version <- 1
-  refused(bad, "was built by another version")
-
-  bad <- qtable
-  tmp <- bad$U
-  bad$U <- bad$M
-  bad$M <- tmp
-  refused(bad, "\\$U was built for other gold shapes")
-
-  bad <- qtable
-  bad$M$ab$a <- bad$M$ab$a * (1 + 1e-15)
-  refused(bad, "\\$M\\$ab was built for other shapes")
-
-  bad <- qtable
-  tmp <- bad$M$ab
-  bad$M$ab <- bad$M$ba
-  bad$M$ba <- tmp
-  refused(bad, "\\$M\\$ab was built for other shapes")
-
-  bad <- qtable
-  bad$U$ab$h <- bad$U$ab$h * (1 + 1e-15)
-  refused(bad, "\\$U\\$ab was built on another grid")
-  bad <- qtable
-  bad$U$ba$n <- 4096L
-  refused(bad, "\\$U\\$ba was built on another grid")
-
-  bad <- qtable
-  bad$M$ba$c3 <- bad$M$ba$c3[-1L]
-  refused(bad, "\\$M\\$ba\\$c3 is not a finite double vector")
-  bad <- qtable
-  bad$U$ab$c5[10L] <- NaN
-  refused(bad, "\\$U\\$ab\\$c5 is not a finite double vector")
-  bad <- qtable
-  bad$U$ab$c0 <- as.integer(bad$U$ab$c0)
-  refused(bad, "\\$U\\$ab\\$c0 is not a finite double vector")
-
-  bad <- qtable
-  bad$M$ba$c5 <- NULL
-  refused(bad, "\\$M\\$ba is not a half-table")
-  bad <- qtable
-  bad$U$extra <- 1
-  refused(bad, "\\$U is not a component table")
-
-  # Well-formed but wrong values: the structural checks pass, the spot
-  # check against stats::qbeta does not.
-  bad <- qtable
-  bad$U$ab$c0 <- bad$U$ab$c0 + 1e-9
-  refused(bad, "\\$U\\$ab does not reproduce stats::qbeta\\(\\)")
-  bad <- qtable
-  bad$M$ba$c3 <- 2 * bad$M$ba$c3
-  refused(bad, "\\$M\\$ba does not reproduce stats::qbeta\\(\\)")
-  bad <- qtable
-  foreign <- fixed_make_half(3, 30)
-  for (name in paste0("c", 0:5)) bad$M$ab[[name]] <- foreign[[name]]
-  refused(bad, "\\$M\\$ab does not reproduce stats::qbeta\\(\\)")
-})
-
-test_that("a table saved to disk and read back is accepted", {
-  inputs <- make_calibration_inputs(n_probes = 600L, seed = 3L)
-  path <- tempfile(fileext = ".rds")
-  on.exit(unlink(path))
-  saveRDS(bmiq_gold_qtable(), path)
-  expect_identical(
-    bmiq_calibration_fixed(inputs$datM, verbose = FALSE, qtable = readRDS(path)),
-    bmiq_calibration_fixed(inputs$datM, verbose = FALSE)
-  )
-})
-
-test_that("the end-of-run warnings list at most ten samples", {
-  expect_identical(fixed_list_samples(1:10, sep = ", "), paste(1:10, collapse = ", "))
-  expect_identical(
-    fixed_list_samples(1:12, sep = ", "),
-    paste(c(1:10, "and 2 more"), collapse = ", ")
-  )
-  expect_identical(fixed_list_samples(character(), sep = "; "), "")
+  refused(list(other = stored$horvath))
 })
 
 test_that("a skipped H step matches bmiq_calibration's optional policy", {
@@ -333,8 +272,8 @@ test_that("a skipped H step matches bmiq_calibration's optional policy", {
   real_fixed <- fixed_fit_mixture
   local_mocked_bindings(
     fit_mixture = mock_h_failure(fit_mixture),
-    fixed_fit_mixture = function(beta, thresholds, fit.idx, context) {
-      fit <- real_fixed(beta, thresholds, fit.idx, context)
+    fixed_fit_mixture = function(beta, thresholds, fit.idx) {
+      fit <- real_fixed(beta, thresholds, fit.idx)
       fit$mu <- c(0.15, 0.5, 1.5)
       fit
     },
@@ -351,15 +290,10 @@ test_that("a skipped H step matches bmiq_calibration's optional policy", {
   expect_false(general$h.applied[1L])
 
   expect_warning(
-    fixed <- bmiq_calibration_fixed(inputs$datM, verbose = FALSE),
-    regexp = "without H.*: 1\\."
+    fixed <- bmiq_calibration_fixed(inputs$datM),
+    regexp = "without H"
   )
   expect_within_pin(fixed, general$calibrated)
-
-  messages <- capture_messages(
-    suppressWarnings(bmiq_calibration_fixed(inputs$datM, verbose = TRUE))
-  )
-  expect_match(messages, "H skipped for sample 1", all = FALSE)
 })
 
 test_that("bmiq_calibration_fixed validates its inputs", {
@@ -385,11 +319,28 @@ test_that("bmiq_calibration_fixed validates its inputs", {
     bmiq_calibration_fixed(datM[, 1:5, drop = FALSE]),
     regexp = "Too few probes"
   )
-  expect_error(bmiq_calibration_fixed(datM, verbose = NA), regexp = "verbose")
 
-  expect_silent(bmiq_calibration_fixed(datM, verbose = FALSE))
-  messages <- capture_messages(bmiq_calibration_fixed(datM))
-  expect_match(messages, "Processing sample 1 of 1", all = FALSE)
+  expect_silent(bmiq_calibration_fixed(datM))
+})
+
+test_that("only a run of more than 200 samples reports progress, on one line", {
+  # Every sample fails at its first step (no value below 0.4), so this is
+  # quick; failed samples count toward progress.
+  datM <- matrix(0.5, nrow = 201L, ncol = 6L)
+  expect_warning(
+    messages <- capture_messages(out <- bmiq_calibration_fixed(datM)),
+    regexp = "NA"
+  )
+  expect_identical(
+    paste(messages, collapse = ""),
+    "Calibrating 201 samples: 20%...40%...60%...80%...100%\n"
+  )
+  expect_true(all(is.na(out)))
+
+  messages <- capture_messages(
+    suppressWarnings(bmiq_calibration_fixed(datM[1:200, ]))
+  )
+  expect_length(messages, 0L)
 })
 
 test_that("a failed sample becomes an NA row and the others proceed", {
@@ -401,8 +352,8 @@ test_that("a failed sample becomes an NA row and the others proceed", {
   datM <- rbind(s1 = good, s2 = bad, s3 = good)
 
   expect_warning(
-    fixed <- bmiq_calibration_fixed(datM, verbose = FALSE),
-    regexp = "1 sample\\(s\\) failed.*: 2 \\(Sample 2 values below 0.4 is empty"
+    fixed <- bmiq_calibration_fixed(datM),
+    regexp = "^Some samples could not be calibrated and are NA\\.$"
   )
   expect_identical(dimnames(fixed), dimnames(datM))
   expect_true(all(is.na(fixed[2L, ])))
@@ -417,13 +368,8 @@ test_that("a failed sample becomes an NA row and the others proceed", {
   expect_identical(general$success, c(TRUE, FALSE, TRUE))
   expect_within_pin(fixed, general$calibrated)
 
-  messages <- capture_messages(
-    suppressWarnings(bmiq_calibration_fixed(datM, verbose = TRUE))
-  )
-  expect_match(messages, "Sample 2 failed .*; replaced with NA", all = FALSE)
-
   # A failed sample is not also reported as calibrated without H.
-  warnings <- capture_warnings(bmiq_calibration_fixed(datM, verbose = FALSE))
+  warnings <- capture_warnings(bmiq_calibration_fixed(datM))
   expect_length(warnings, 1L)
 })
 
@@ -431,7 +377,6 @@ test_that("bmiq_calibration_fixed leaves the random state as found", {
   inputs <- make_calibration_inputs(n_probes = 500L, seed = 3L)
 
   expect_random_state_kept(function() {
-    bmiq_calibration_fixed(inputs$datM, verbose = FALSE)
+    bmiq_calibration_fixed(inputs$datM)
   })
-  expect_random_state_kept(bmiq_gold_qtable)
 })

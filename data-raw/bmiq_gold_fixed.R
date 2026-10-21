@@ -1,8 +1,10 @@
 ## Writes the gold-standard fits that bmiq_calibration_fixed() carries as
 ## numbers (FIXED_GOLD in R/bmiq_calibration_fixed.R). Run from the package
 ## root after any change to the gold data or the EM, and paste the output
-## over the FIXED_GOLD block. tests/testthat/test-bmiq-fixed.R checks that
-## the pasted numbers are the live bmiq_gold_fit() result.
+## over the FIXED_GOLD block, then run data-raw/bmiq_gold_qtable.R to
+## rebuild the gold quantile table from the pasted numbers.
+## tests/testthat/test-bmiq-fixed.R checks that the pasted numbers are the
+## live bmiq_gold_fit() result and that the table was built for them.
 ##
 ## Each value is written as a hexadecimal floating-point literal, which R
 ## parses exactly on every platform (its decimal parser is not correctly

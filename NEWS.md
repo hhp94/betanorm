@@ -1,24 +1,25 @@
 # betanorm 0.1.3
 
-* New `bmiq_calibration_fixed()`: `bmiq_calibration()` at its defaults (the
-  legacy three-state configuration) against a built-in gold-standard fit
-  chosen by name. `gold = "horvath"` is the fit of
+* New internal `bmiq_calibration_fixed()`, not exported:
+  `bmiq_calibration()` at its defaults (the legacy three-state
+  configuration) against a built-in gold-standard fit chosen by name, for
+  pipelines that copy the code. `gold = "horvath"` is the fit of
   `horvath_goldstandard$goldstandard2`, so nothing is refitted for the
-  gold. It takes `datM`, `gold`, `verbose` and `qtable`, returns the
-  calibrated matrix, turns a failed sample into a row of `NA` (the warning
-  gives its index and the error), and warns which samples ran without H.
-  Its output agrees with the `calibrated` element of
+  gold. It takes `datM` and `gold` and returns the calibrated matrix. A
+  sample that cannot be calibrated becomes a row of `NA`; one warning says
+  that some samples did, another that some ran without H. Above 200
+  samples it reports progress on one line, in steps of 20%.
+* The gold side of its quantile map reads a table of the gold quantiles
+  (quintic Hermite on 8192 nodes in log p, within 1e-14 of
+  `stats::qbeta()`), built ahead of time and stored with the package, in
+  place of `stats::qbeta()`. Its output therefore agrees with the
+  `calibrated` element of
   `bmiq_calibration(datM, horvath_goldstandard$goldstandard2, on.sample.error = "continue")`
-  to within 1e-14 (not bit for bit: see the next item), and its source
-  file stands alone, for pipelines that copy the code.
-* New `bmiq_gold_qtable()`: the gold-side quantiles that
-  `bmiq_calibration_fixed()` needs, as a precomputed table (quintic Hermite
-  on 8192 nodes in log p, within 1e-14 of `stats::qbeta()`; about 70 ms to
-  build, 1.5 MB). `bmiq_calibration_fixed()` builds one per call by
-  default; pass one as `qtable` to reuse it across calls. On the six EPIC
-  samples the fixed function takes 0.16 s with a passed table against
-  0.30 s for `bmiq_calibration()`, which still calls `stats::qbeta()` and is
-  unchanged.
+  to within 1e-14, not bit for bit. On the six EPIC samples it takes
+  0.12 s against 0.29 s for `bmiq_calibration()`, which still calls
+  `stats::qbeta()` and is unchanged.
+* Its source file and the stored table (`FIXED_QTABLE` in
+  `R/sysdata.rda`) stand alone.
 
 # betanorm 0.1.2
 

@@ -423,7 +423,9 @@ entries hold the outcomes; the full log is in git history, as
 
 Amended the same day by the gold quantile table entry below: the gold
 side of `map_beta_q` now reads a table, and the output pin is 1e-14, not
-`identical()`. The rest stands.
+`identical()`. Amended again by the "internal, quiet" entry below: the
+function is not exported, has no `verbose`, and its warnings no longer
+name samples or errors. The rest stands.
 
 `R/bmiq_calibration_fixed.R` is `bmiq_calibration()` cut to the Horvath
 legacy configuration, for the downstream package to vendor in place of
@@ -478,6 +480,12 @@ gold fit is all that is saved; the quantile map still dominates
 (`dev/to-do.md`, gold quantile table).
 
 ## 2026-10-20 — Gold quantile table in `bmiq_calibration_fixed()` (0.1.3, deliberate numerics change)
+
+Amended the same day by the stored table entry below: the table is
+built ahead of time into `R/sysdata.rda`, and the **API** paragraph
+(the `qtable` argument, the exported builder, the passed-table checks)
+is superseded. The table itself, the contract and the measurements
+stand.
 
 The gold side of the quantile map in `bmiq_calibration_fixed()` reads a
 precomputed table in place of `stats::qbeta()`; the sample side stays
@@ -594,6 +602,143 @@ and `test-boost-math.R`, stays tracked for a later threading thread).
 `dev/qtable-exp.R` is opted in: the code comments, the tests and this
 entry cite it. The hand-off plan `dev/bmiq_calibration_fixed.md` stays
 untracked; this entry is its outcome.
+
+## 2026-10-20 — The gold quantile table ships in `R/sysdata.rda` (0.1.3)
+
+The table is built once, ahead of time, by `data-raw/bmiq_gold_qtable.R`
+and stored as `FIXED_QTABLE` in `R/sysdata.rda`: one entry per gold set
+in `FIXED_GOLD`, components `U` and `M`, each two half-tables with their
+grid and coefficients. `bmiq_calibration_fixed()` reads it; nothing
+builds a table at call time or at install (user, 2026-10-20). At
+vendoring time the downstream pins a commit, copies `FIXED_QTABLE` from
+this `R/sysdata.rda` into its own under the same name, and copies
+`R/bmiq_calibration_fixed.R` stripping only roxygen lines: no edit after
+the copy, so the two R files never differ.
+
+Cut: the `qtable` argument, the exported `bmiq_gold_qtable()`,
+`fixed_validate_qtable()` with its spot check, `FIXED_QTABLE_VERSION`
+and the grid constants. The builder moved to the data-raw script
+unchanged (same arithmetic, grid anchored at log(1/2)), so the vendored
+file carries only the evaluator. Added: `fixed_gold_qtable()`, run on
+every call, refuses a stored table whose component and half shapes are
+not `identical()` to `FIXED_GOLD`. The table travels apart from the R
+file, and one from another commit would otherwise map through the wrong
+quantiles silently. It costs microseconds; the coefficients themselves
+are checked by the tests, not per call.
+
+Why ahead of time (measured 2026-10-20 on the six EPIC samples,
+installed, `bench::mark` median of 15):
+
+- **Per call** (the old `qtable = NULL` default): 65 ms per call to
+  build, 183 ms against 117 ms for the six samples. It is per call, not
+  per sample, so it dominates a caller that calibrates a few samples at
+  a time.
+- **At install** (one top-level line building the constant into the
+  namespace): the same call time and nothing in the repo, but every
+  installing machine rebuilds the table with its own Rmath, the
+  downstream included. Rejected: the downstream takes the numbers, it
+  does not rebuild them.
+- **Hex literals in the R file**, as for `FIXED_GOLD`: 196,632 lines,
+  4.6 MB of source in the vendored file. Rejected.
+
+As with `FIXED_GOLD`, the stored table (built here, R 4.6.0, mingw gcc
+14.2) is the contract on every platform, instead of each platform's
+`qbeta`.
+
+Costs: 1.08 MB in the repo and the tarball (xz), and another blob in git
+history at each rebuild; `sysdata.rdb` is 1.09 MB installed. First use
+in a session costs 23 ms, because R CMD INSTALL compresses a
+`sysdata.rda` over 1e6 bytes with xz; `SysDataCompression: gzip` in
+DESCRIPTION would make it about 3 ms at 1.28 MB, but it is not set,
+since the downstream does not copy DESCRIPTION. `R/sysdata.rda` holds
+`FIXED_QTABLE` and nothing else; the script overwrites it whole.
+
+Output: `identical()` to the previous `qtable = NULL` path here on the
+six EPIC samples and 11 synthetic ones, so the 1e-14 pin to
+`bmiq_calibration()` and the snapshots are unchanged. Fixed 0.12 s,
+general 0.29 s.
+
+`tests/testthat/test-bmiq-fixed.R` checks the stored table against
+`FIXED_GOLD` for every gold set and against the documented grid (8192
+nodes from log(1/2) down to 1e-30, finite coefficient vectors of length
+n - 1). The qbeta sweeps, the node test, the fallback and the real-input
+test read the stored table, and a stored table with its components or
+halves swapped, a shape one ulp off, or no entry for the gold stops the
+call. The malformed passed-table cases and the saved-table round trip
+went with the argument. To regenerate: `data-raw/bmiq_gold_fixed.R`
+(paste its output), then `data-raw/bmiq_gold_qtable.R`.
+
+## 2026-10-20 — `bmiq_calibration_fixed()` is internal, quiet, and plainly commented (0.1.3)
+
+The downstream copies the file word for word, so any change it would
+want is a commit here. The file therefore carries as little as it can
+(user, 2026-10-20):
+
+- **Internal.** Not exported: `@keywords internal` and `@noRd`, so no
+  help page. The downstream calls its own copy, the tests reach it in the
+  namespace, and a user can call `betanorm:::bmiq_calibration_fixed()`.
+  The README no longer lists it.
+- **No `verbose`.** The signature is `(datM, gold = "horvath")`. The
+  per-sample messages (progress, H skipped, sample failed) are gone: for a
+  few dozen samples the run takes seconds and they were noise. Above 200
+  samples the run reports progress on one line, "Calibrating n samples:
+  20%...40%...60%...80%...100%" (`message(appendLF = FALSE)` per step; a
+  failed sample counts). The function is only used at the Horvath gold's ~21k
+  probes (user), where a sample takes 20 ms here and about 50 ms on the
+  user's 2021 machine, so 200 samples are 4 to 10 s of silence. A line per
+  100 samples, and a fixed "may take a couple of minutes" notice, were
+  considered: the notice was wrong at that scale, and one line is all the
+  progress a run of minutes needs. Steps by count, not by time, so the
+  output is the same on every machine.
+- **Plain conditions.** Each `stop()` and `warning()` is one fixed
+  message, with no sample index, no values and no `call. = FALSE`, and
+  the `context` argument the helpers threaded through for their messages
+  is gone. A sample that cannot be calibrated is still an `NA` row, which
+  is the signal. One warning says that some samples are `NA`, another that
+  some were calibrated without H (which the output does not show). The
+  sample lists in those warnings went, and with them their cap at ten
+  (`fixed_list_samples()`, from the review of the same day).
+  `fixed_gold_qtable()` stays; its message is now "FIXED_QTABLE does not
+  match FIXED_GOLD."
+- **Comments cut to what the code needs** (the licence header, the
+  component order, the table layout, the node placement, the H map, the
+  block loop). The reasons they used to give are recorded here or in the
+  entries named:
+  - the endpoint clip is half the distance to the nearest interior value,
+    as in legacy BMIQ; the length guards cover an all-0 or all-1 fit
+    subset ("Validation: one owner per invariant"), and the floor at
+    `sqrt(.Machine$double.eps)` keeps a subnormal value from rounding
+    back to 0 or 1 and feeding `log(0)` to the EM;
+  - the sample modes are clamped to [0, 1] because `density()` is not
+    boundary-corrected, so its Gaussian tails can put the mode just
+    outside; the clamp only moves the initial thresholds toward a valid
+    value;
+  - the mode-shifted initial thresholds are EM starting cuts, not fitted
+    roots, so sorting a crossed pair is safe;
+  - two Beta densities can cross twice, so the crossing taken is the one
+    where component k stops dominating and k + 1 takes over; the
+    log-density ratio has at most one interior turning point, so cutting
+    there brackets every sign change;
+  - one fit subset is drawn for all samples (same probe count, `nfit` and
+    seed);
+  - every U and M value goes to exactly one tail, so a value at the
+    component mean is mapped too;
+  - the H set is never empty (code review, chunk 3), and the H map is
+    glued to the calibrated U maximum and upper-M minimum without the
+    legacy gaps ("Legacy compatibility", step 3);
+  - `datM` is asserted double, not coerced ("Validation: one owner per
+    invariant"); the output is a fresh matrix, so the scatter writes into
+    it without touching `datM`; a block of eight samples is one 64-byte
+    cache line per probe ("Rejected cleanups");
+  - the table's layout, fallback and node placement, and the 1e-14
+    measurement: the gold quantile table entry above;
+  - the hex literals: the one-file entry above.
+
+Output `identical()` to before on the six EPIC samples and 11 synthetic
+ones. `test-bmiq-fixed.R` drops the message and sample-list checks, pins
+the two warnings' text and the progress line, which only a run of more
+than 200 samples gets (201 samples that fail at once), and mocks the
+fitter with its new signature.
 
 ## 2026-09-25 — GPL (>= 3), with the upstream authors as `cph` (0.1.0)
 
