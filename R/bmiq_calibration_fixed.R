@@ -273,16 +273,18 @@ fixed_qbeta_table <- function(p, gold.table, lower.tail) {
   zero <- u == -Inf
   one <- u >= 0
   small <- u > u0 & u <= u1 # p in (p.min, 1/2]
-  ubig <- log(-expm1(u)) # log(1 - p)
-  big <- u > u1 & u < 0 & ubig > u0 # p in (1/2, 1 - p.min)
+  big <- u > u1 & u < 0
+  ubig <- log(-expm1(u[big])) # log(1 - p), only where p > 1/2
+  big[big] <- ubig > u0 # p in (1/2, 1 - p.min)
+  ubig <- ubig[ubig > u0]
   if (lower.tail) {
     out[small] <- fixed_eval_half(u[small], ab)
-    out[big] <- 1 - fixed_eval_half(ubig[big], ba)
+    out[big] <- 1 - fixed_eval_half(ubig, ba)
     out[zero] <- 0
     out[one] <- 1
   } else {
     out[small] <- 1 - fixed_eval_half(u[small], ba)
-    out[big] <- fixed_eval_half(ubig[big], ab)
+    out[big] <- fixed_eval_half(ubig, ab)
     out[zero] <- 1
     out[one] <- 0
   }

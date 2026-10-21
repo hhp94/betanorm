@@ -672,12 +672,19 @@ Rcpp::List beta_mixture_em_cpp(
             bm1[k] = b[k] - 1.0;
         }
 
-        loglikelihood = 0.0;
+        // The log-likelihood is the sum of the maxima plus the sum of
+        // log(sum_exp). Each sum_exp lies in [1, K], so 256 of them multiply
+        // to at most 3^256, about 1e122, and take one log.
+        double sum_maximum = 0.0;
+        double sum_log_sum_exp = 0.0;
+        double product_sum_exp = 1.0;
+        int product_count = 0;
 
         for (R_xlen_t i = 0; i < n; ++i)
         {
             double maximum =
                 -std::numeric_limits<double>::infinity();
+            R_xlen_t largest = 0;
 
             for (R_xlen_t k = 0; k < K; ++k)
             {
@@ -686,35 +693,49 @@ Rcpp::List beta_mixture_em_cpp(
                     am1[k] * log_y[i] +
                     bm1[k] * log1m_y[i];
 
-                maximum =
-                    std::max(maximum, log_component[k]);
+                if (maximum < log_component[k])
+                {
+                    maximum = log_component[k];
+                    largest = k;
+                }
             }
 
+            // The largest term is exp(0), exactly 1, so it needs no call.
             double sum_exp = 0.0;
 
             for (R_xlen_t k = 0; k < K; ++k)
             {
                 exp_shifted[k] =
-                    std::exp(log_component[k] - maximum);
+                    k == largest
+                        ? 1.0
+                        : std::exp(log_component[k] - maximum);
                 sum_exp += exp_shifted[k];
             }
 
-            if (!(sum_exp > 0.0) ||
+            // Before the skip, a non-finite maximum made sum_exp NaN.
+            if (!std::isfinite(maximum) ||
+                !(sum_exp > 0.0) ||
                 !std::isfinite(sum_exp))
             {
                 Rcpp::stop(
                     "Non-finite mixture likelihood in E-step");
             }
 
-            const double log_mixture =
-                maximum + std::log(sum_exp);
+            sum_maximum += maximum;
+            product_sum_exp *= sum_exp;
 
-            loglikelihood += log_mixture;
+            if (++product_count == 256)
+            {
+                sum_log_sum_exp += std::log(product_sum_exp);
+                product_sum_exp = 1.0;
+                product_count = 0;
+            }
 
             // Single-exp E-step: responsibilities reuse the max-shifted
-            // exponentials rather than re-exponentiating against log_mixture.
-            // Not bit-identical to the log-space form (see DECISIONS.md,
-            // single-exp adoption); snapshots pin the current numerics.
+            // exponentials rather than re-exponentiating against
+            // maximum + log(sum_exp). Not bit-identical to the log-space form
+            // (see DECISIONS.md, single-exp adoption); snapshots pin the
+            // current numerics.
             const double inv_sum = 1.0 / sum_exp;
 
             for (R_xlen_t k = 0; k < K; ++k)
@@ -723,6 +744,10 @@ Rcpp::List beta_mixture_em_cpp(
                     exp_shifted[k] * inv_sum;
             }
         }
+
+        loglikelihood =
+            sum_maximum +
+            (sum_log_sum_exp + std::log(product_sum_exp));
 
         for (R_xlen_t k = 0; k < K; ++k)
         {

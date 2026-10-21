@@ -303,7 +303,9 @@ Kept as they are:
   variance; a zero variance is refused one check earlier.
 - **The Welford update's division per observation.** Plain weighted sums
   would change the arithmetic, and the EM is about 26% of runtime (the -O2
-  profile); the quantile map is where the time goes.
+  profile); the quantile map is where the time goes. Benched 2026-10-21
+  ("one `log` per 256 values" below): it saves 0.23 ms per EM call and
+  moves the shapes by 3e-7, so it stays.
 - **The redundant `!std::isfinite(p)`.** Bit-identical either way; not
   worth churn in a vendored file.
 
@@ -882,7 +884,8 @@ still miss:
   component gets the same values in the same order, but it saves only
   rereading a working set of about 1 MB that sits in cache; the Welford
   divisions and the E-step's `exp` and `log` stay. A bench candidate if
-  the EM ever needs to be faster.
+  the EM ever needs to be faster. Benched 2026-10-21: it is slower ("one
+  `log` per 256 values" below).
 - Making `w` optional changes the return list pinned by
   `test-cpp-contract.R`, and the general path reads `w` for its
   responsibility-count diagnostic. Fixed-size arrays and templates on
@@ -893,7 +896,9 @@ still miss:
 Noted, not measured: per observation the E-step calls `exp` K times and
 `log` once, likely most of the EM's time. For the largest component
 `log_component[k] - maximum` is exactly 0 and `exp(0)` is exactly 1, so
-skipping that call would be bit-identical.
+skipping that call would be bit-identical. Measured and done 2026-10-21
+("one `log` per 256 values" below): the skip saves 2%, because `exp(0)`
+is a fast path; the per-value `log` was the cost.
 
 Known, for a CRAN submission: testthat skips snapshot expectations on
 CRAN (`cran = FALSE`), so `test-numeric-regression.R` does not run
@@ -980,6 +985,82 @@ Known: regenerating the gold still goes through R's generator
 `sample.int()` would show as a failed `identical()` pin, and the stored
 numbers stay the contract, as with `std::lgamma` (the one-file entry
 above).
+
+## 2026-10-21 — The E-step takes one `log` per 256 values (0.1.3, deliberate numerics change)
+
+Asked by the user after the fixed path's profile. Each sample took 20.4 ms
+(installed -O2, sample 1 of the six EPIC samples):
+
+| Stage | Time |
+|---|---|
+| EM (`fixed_fit_mixture()`) | 11.9 ms |
+| `stats::pbeta()` | 4.0 ms |
+| Gold table | 2.4 ms |
+| Two `density()` modes | 1.3 ms |
+
+On this machine (mingw, R 4.6.0) `log` on [1, 3] takes 26 ns, `exp` on
+(-60, 0) 11.6 ns, and `exp(0)` 1 ns (a fast path).
+
+Kernel variants, compiled with `Rcpp::sourceCpp` at -O2 and run on the
+fixed path's EM inputs for the six samples (n = 20306, `maxiter = 5`):
+
+- **Before: 10.5 ms** per EM call.
+- **The largest term's `exp` skipped: 10.3 ms, bit-identical**, the chunk-2
+  kernel review's "noted, not measured". `log_component[k] - maximum` is
+  exactly 0 there and `exp(0)` is exactly 1. The gain is small because
+  that `exp` was the fast path. The stop now also checks `maximum`, since
+  before the skip a non-finite maximum made `sum_exp` NaN.
+- **One `log` per 256 values: 4.98 ms. Kept.** The largest term is exactly
+  1 and the others lie in [0, 1], so each `sum_exp` lies in [1, K]. 256 of
+  them multiply to at most 3^256, about 1e122, so the kernel takes one
+  `log` of each block's product. The log-likelihood is the sum of the
+  maxima plus the sum of those logs. A block's product carries at most 256
+  roundings, about 2.8e-14 relative, which is 2.8e-14 absolute in its
+  `log`.
+  - Only `llike` and `loglik_criterion` change. The responsibilities,
+    shapes, weights, means and iteration counts are `identical()` at
+    `maxiter` 5 and 25.
+  - `llike` moves by 9.6e-15 relative. That is the old single running
+    sum's rounding against the new split one, not lost accuracy.
+  - `llike` only feeds `loglik_criterion`, so a fit can stop one
+    iteration earlier or later only when the criterion is within about
+    1e-11 of `tol`. At `niter = 5` every call runs all five iterations.
+- **Rejected: accumulating the next M-step's statistics inside the E-step
+  loop.** It is bit-identical (same values, same order) but slower: 5.83
+  ms against 4.96.
+- **Rejected: shifted plain sums in place of Welford's division.** 4.75 ms
+  against 4.98, and the shapes move by up to 3.2e-7 relative through the
+  EM feedback.
+
+R side: `fixed_qbeta_table()` takes `log(1 - p)` only where p > 1/2,
+instead of for every value. On sample 1 that is none of upper-U and 7 to
+9% of lower-U and upper-M, about 0.7 ms per sample. It is bit-identical:
+`identical()` on 600k values of p (0, 1, subnormals, p.min, both sides of
+1/2, both components and tails) and on the six samples' output.
+
+**Results** (installed -O2, `bench::mark` median of 25, six EPIC samples):
+
+| Call | Before | After |
+|---|---|---|
+| `bmiq_calibration_fixed()` | 124 ms | 87 ms |
+| `bmiq_calibration()` | 299 ms | 260 ms |
+| `bmiq_gold_fit()` of the Horvath gold | 14.1 ms | 8.3 ms |
+
+The fixed output, the general calibrated matrix, and the gold fit's
+shapes, thresholds and modes are `identical()` to before.
+`FIXED_GOLD`, `FIXED_QTABLE` and the `identical()` gold pin stand.
+
+What moved:
+
+- The general function's `debug = TRUE` gold diagnostics:
+  `log_likelihood` by 8.7e-16 relative, and `loglik_criterion` with its
+  trace by 1.6e-12.
+- The nL = 3 EM snapshot was re-recorded: `llike` moved by 6.4e-16
+  relative and `loglik_criterion` by 3.7e-11; its other fields are
+  `identical()`. The other snapshots are unchanged.
+
+The downstream takes `src/bmiq_norm.cpp` with the fixed file at its next
+pin.
 
 ## 2026-09-25 — GPL (>= 3), with the upstream authors as `cph` (0.1.0)
 

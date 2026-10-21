@@ -19,10 +19,19 @@
   every value, its output differs from that of
   `bmiq_calibration(datM, horvath_goldstandard$goldstandard2)`, which fits
   a random subset, by up to 9e-4 on the six EPIC samples. On those samples
-  it takes 0.12 s against 0.29 s for `bmiq_calibration()`, which still
+  it takes 0.09 s against 0.26 s for `bmiq_calibration()`, which still
   calls `stats::qbeta()` and is unchanged.
 * Its source file and the stored table (`FIXED_QTABLE` in
   `R/sysdata.rda`) stand alone.
+* The mixture EM is about twice as fast: per E-step it takes one `log`
+  per 256 values instead of one per value, and it skips the `exp` of each
+  value's largest term, which is exactly 1. On the six EPIC samples,
+  `bmiq_calibration()` takes 0.26 s instead of 0.30 s and `bmiq_gold_fit()`
+  of the Horvath gold 8 ms instead of 14. The calibrated values and the
+  fitted shapes are unchanged on those samples. Only the log-likelihood
+  moves, in its last digits: its convergence criterion by at most 4e-11
+  relative. So a fit could stop one iteration earlier or later only if
+  that criterion sits that close to `tol`.
 * `bmiq_calibration()` and `bmiq_gold_fit()` keep the session's
   random-number generator kind when the session has no `.Random.seed`.
   Before, a session that chose another kind (for example
