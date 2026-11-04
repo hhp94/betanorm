@@ -510,10 +510,10 @@ bmiq_calibration_fixed <- function(datM, gold = "horvath") {
   }
 
   if (any(failed)) {
-    warning("Some samples could not be calibrated and are NA.")
+    warning("Some samples could not be calibrated and are NA.", call. = FALSE)
   }
   if (any(!h.applied & !failed)) {
-    warning("Some samples were calibrated without H.")
+    warning("Some samples were calibrated in part, their intermediate values left as they were.", call. = FALSE)
   }
 
   calibrated

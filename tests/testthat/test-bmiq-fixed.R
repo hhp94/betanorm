@@ -335,7 +335,7 @@ test_that("a skipped H step matches bmiq_calibration's optional policy", {
 
   expect_warning(
     fixed <- bmiq_calibration_fixed(inputs$datM),
-    regexp = "without H"
+    regexp = "^Some samples were calibrated in part, their intermediate values left as they were\\.$"
   )
   expect_within_pin(fixed, general$calibrated)
 })
@@ -410,9 +410,36 @@ test_that("a failed sample becomes an NA row and the others proceed", {
   expect_identical(general$success, c(TRUE, FALSE, TRUE))
   expect_within_pin(fixed, general$calibrated)
 
-  # A failed sample is not also reported as calibrated without H.
+  # A failed sample is not also reported as calibrated in part.
   warnings <- capture_warnings(bmiq_calibration_fixed(datM))
   expect_length(warnings, 1L)
+})
+
+test_that("neither warning of bmiq_calibration_fixed carries a call", {
+  # A downstream package's users see these warnings as they stand, and the
+  # internal call means nothing to them. One failed sample, and one whose
+  # upper-M tail is empty so that H fails, give both warnings in one run.
+  real_fixed <- fixed_fit_mixture
+  local_mocked_bindings(
+    fixed_fit_mixture = function(beta, thresholds) {
+      fit <- real_fixed(beta, thresholds)
+      fit$mu <- c(0.15, 0.5, 1.5)
+      fit
+    },
+    .package = "betanorm"
+  )
+  good <- make_calibration_inputs(n_probes = 1500L, seed = 11L)$datM[1L, ]
+  datM <- rbind(s1 = good, s2 = pmax(good, 0.45))
+
+  seen <- list()
+  withCallingHandlers(
+    bmiq_calibration_fixed(datM),
+    warning = function(w) {
+      seen[[length(seen) + 1L]] <<- w
+      invokeRestart("muffleWarning")
+    }
+  )
+  expect_identical(lapply(seen, conditionCall), list(NULL, NULL))
 })
 
 test_that("bmiq_calibration_fixed draws no random number", {
