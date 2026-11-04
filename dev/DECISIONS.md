@@ -700,6 +700,10 @@ Amended 2026-10-21 by the "used as they are" entry below (0.1.5): the
 `@keywords internal` and `@noRd` block is now plain comments, so the file
 has no roxygen. The function is still not exported. The rest stands.
 
+Amended 2026-11-04 by the "two warnings" entry below (0.1.6): under
+"Plain conditions", the two warnings take `call. = FALSE`, and the second
+no longer says H. The `stop()` calls and the rest stand.
+
 The downstream copies the file word for word, so any change it would
 want is a commit here. The file therefore carries as little as it can
 (user, 2026-10-20):
@@ -1213,6 +1217,30 @@ second version bump (user).
 
 Not run: sanitizers. mingw has none; rhub's clang-asan and clang-ubsan
 containers would be the way.
+
+## 2026-11-04 — The two warnings of `bmiq_calibration_fixed()` read for the downstream's users (0.1.6)
+
+Amends "Plain conditions" in the "internal, quiet" entry above, for these
+two warnings only (user, 2026-11-04). That entry weighed how little the
+file should carry, not how a warning reads once it is copied. The
+downstream copies the file byte for byte, so its users saw the internal
+call and the word H, which mean nothing to them, and the copy cannot be
+edited.
+
+- **Both take `call. = FALSE`.**
+- **The second says what happened without naming H:** "Some samples were
+  calibrated in part, their intermediate values left as they were." The
+  first keeps its text, "Some samples could not be calibrated and are NA."
+  Each is still one fixed message, with no sample index and no values.
+
+Not changed: every `stop()` keeps its call, the progress message above 200
+samples stays, and so do `h_applied` and `h.ok`. `bmiq_calibration()` keeps
+its own warning, which says "without H". The older mentions of the text in
+this log and in the 0.1.3 NEWS stand as history.
+
+`test-bmiq-fixed.R` pins the new text and runs one call that raises both
+warnings, to check that neither carries a call. No number moved: only the
+two `warning()` calls changed, and the snapshots pass unchanged.
 
 ## 2026-09-25 — GPL (>= 3), with the upstream authors as `cph` (0.1.0)
 

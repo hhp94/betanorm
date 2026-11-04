@@ -1,3 +1,11 @@
+# betanorm 0.1.6
+
+* The two warnings of the internal `bmiq_calibration_fixed()` read properly
+  for the users of a downstream package, which copies the file as it is.
+  Neither shows the internal call any more, and "calibrated without H" is
+  now "calibrated in part, their intermediate values left as they were".
+  All results are unchanged.
+
 # betanorm 0.1.5
 
 * The files a downstream package copies are usable as they are, with no
