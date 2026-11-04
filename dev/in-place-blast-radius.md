@@ -36,9 +36,9 @@ nrow(...))` after the matrix assertion. Not a choice, so the
   `process_sample()`. Its block column keeps the gathered values and the
   scatter writes them back, so in copy mode a skipped row passes through
   unchanged at no cost. Returning NA instead needs an explicit fill.
-- **Bug to avoid:** the "calibrated without H" warning tests
-  `any(!h.applied & !failed)`. A skipped sample has both `FALSE`, so it
-  would fire for every skip. It needs `& !skip`.
+- **Bug to avoid:** the "calibrated in part" warning ("calibrated without
+  H" before 0.1.6) tests `any(!h.applied & !failed)`. A skipped sample has
+  both `FALSE`, so it would fire for every skip. It needs `& !skip`.
 - The progress line counts `nrow(datM)` (text pinned in
   `test-bmiq-fixed.R`: "Calibrating 201 samples"). Decide whether it counts
   all rows or only the samples processed, and whether the 200-sample
