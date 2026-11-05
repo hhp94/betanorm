@@ -83,6 +83,11 @@ by default) so release builds carry zero overhead.
 
 ## 2026-08-10 — Validation: one owner per invariant
 
+Amended 2026-11-04 by the "checks values per sample" entry below (0.1.7):
+`bmiq_calibration_fixed()` runs the scanner once per sample, and a sample
+it refuses is an `NA` row, not a stop. The scanner is still the one owner.
+The rest stands.
+
 Defensiveness audit outcome. Each invariant has exactly one owner; a second
 check of the same invariant elsewhere is a bug (drift risk, misleading error
 source), not extra safety:
@@ -157,6 +162,11 @@ Amended 2026-10-21 by the quantile-kernel entry below (0.1.5): item 3's
 order is a strict weak ordering with NaN last (NaNs are equivalent to one
 another), not a total order, and the target sort now uses it too. The
 rest stands.
+
+Amended 2026-11-04 by the "checks values per sample" entry below (0.1.7):
+the "per-sample value scan" in the last paragraph is no longer a divergence.
+`bmiq_calibration_fixed()` scans per sample too, and the downstream is
+dropping its own scan. The rest stands.
 
 The downstream package vendors these kernels and on 2026-08-10 ran a
 memory-safety audit over them. Taken back here, all bit-identical, none
@@ -507,6 +517,11 @@ is superseded. The table itself, the contract and the measurements
 stand; since 2026-10-21 the general function in the contract is run
 against the stored gold's fit, with each sample fitted on every value, in
 order ("fits every value" below).
+
+Amended 2026-11-04 by the "checks values per sample" entry below (0.1.7):
+the **Contract** paragraph, its dimnames and `NA` pattern included, holds
+only over input `bmiq_calibration()` accepts. On a value it refuses it
+stops, and the fixed function gives an `NA` row. The rest stands.
 
 The gold side of the quantile map in `bmiq_calibration_fixed()` reads a
 precomputed table in place of `stats::qbeta()`; the sample side stays
@@ -1241,6 +1256,91 @@ this log and in the 0.1.3 NEWS stand as history.
 `test-bmiq-fixed.R` pins the new text and runs one call that raises both
 warnings, to check that neither carries a call. No number moved: only the
 two `warning()` calls changed, and the snapshots pass unchanged.
+
+## 2026-11-04 — `bmiq_calibration_fixed()` checks values per sample, so a bad sample fails alone (0.1.7)
+
+The downstream copies the fixed file byte for byte and is dropping its own
+[0, 1] check on this function's input, so the check here becomes the only
+one (user, 2026-11-04). Until now one `NA`, or one value outside [0, 1], in
+any sample stopped the call, and the downstream's `tryCatch` then turned
+every sample `NA`. A sample's calibration reads only its own vector and the
+fixed gold, so nothing crosses rows and a bad sample need not cost the
+others.
+
+- **The check runs per sample, and the scanner is still its one owner.** The
+  one call to `scan_finite_unit_interval_cpp()` moved from the top of the
+  function to the first line of `process_sample()`, with the same closed
+  interval, so an exact 0 or 1 passes. There is no second check and no new
+  kernel. `src/bmiq_norm.cpp`, the `RcppExports` files and
+  `bmiq_calibration()` are unchanged, and "Validation: one owner per
+  invariant" stands.
+- **A bad sample takes the failed-sample path.** Its row is `NA` (not `NaN`,
+  whatever it held), none of its work is done, and the call gives the
+  existing warning once: "Some samples could not be calibrated and are NA."
+  It has no index or value ("Plain conditions" stands), so it does not say
+  whether a sample was refused or failed later.
+- **The scan is what catches values outside [0, 1].** Measured with the scan
+  removed: a sample holding `-1e-12`, `1 + 1e-12`, `1.5` or `-0.5` calibrates
+  to a full row of numbers. `stats::pbeta()` reads a value below 0 as 0 and
+  one above 1 as 1, the endpoint clip moves it for the EM, and the +/-1e-12
+  tolerance is on the output. So no later failure can stand in for this
+  check.
+- **What is about the call still stops it:** `gold`, the matrix's type and
+  shape, the stored table's check, and "Too few probes." That last one used
+  to lose to the scan on a matrix that also held a bad value; now it always
+  stops.
+- **An all-missing matrix of any storage mode gives `NA` rows too.**
+  `checkmate::assert_matrix(mode = "double")` skips the mode check when every
+  value is missing, so `matrix(NA, 2, 6)`, a logical matrix, passes it, and
+  only the scan used to refuse it. The gather now coerces it, and each row
+  fails the scan. An integer matrix holding any value is still refused.
+
+**The agreement contract narrows.** On these values `bmiq_calibration()`
+stops, where the fixed function now gives an `NA` row. So the contract in the
+gold quantile table entry above, agreement within 1e-14 with identical
+dimnames and `NA` pattern, holds only over input the general function
+accepts. Over that input it stands: a sample that fails later is an `NA` row in
+both, the general function under `on.sample.error = "continue"`. The general
+function is not changed to match, since it stops by design and is not what the
+downstream copies.
+
+**Numbers.** No value moved. Against `eaa24ee`, the output on the six EPIC
+samples, on 11 synthetic samples, on a sample holding an exact 0 and 1, and on
+a sample that fails at its mode estimate is `identical(num.eq = FALSE)` and
+equal by `serialize()`. The snapshots pass unchanged. Installed at R's default
+flags (`bench::mark` medians, two runs each): the six EPIC samples take 79.5
+and 80.9 ms before, 80.1 and 80.9 ms after. The scan of one sample's 20,306
+values takes 8.3 us against 13.1 ms for the sample, and a call on one bad
+sample takes about 0.25 ms.
+
+**Tests** (`test-bmiq-fixed.R`). Each of `NA`, `NaN`, `Inf`, `-Inf`, `-1e-12`
+and `1 + 1e-12` in turn, in a sample of three and in sample 10 of 11 (the
+second block): one warning, that row all `NA`, dimnames kept, the other rows
+`identical()` to the clean run's. A bad sample never reaches the mode estimate.
+An exact 0 and 1 stay 0 and 1, within the pin to the general function. Every
+sample bad gives all `NA`, one warning and no error, as does an all-missing
+matrix of each mode. "Too few probes." stops with a bad value present, and
+`bmiq_calibration()` stops on each bad value. The two expectations in "validates
+its inputs" that a bad value stops the call are gone. All but the exact 0 and 1
+and the general function's stop fail on the old code. Six mutants built in
+memory each fail at least one test: no scan, the scan after the work,
+`require_open = TRUE`, the scan over the whole block, "Too few probes." as a
+warning, and a failed row written as `NaN`.
+
+**Bears on work in flight.** The up-front scan thread in `dev/to-do.md`: a pass
+before any sample would now have to give this function one verdict per row, not
+stop. `dev/in-place-blast-radius.md`, scoped before this, takes the whole-matrix
+scan as given: it says a bad row refuses the call, that exempting skipped rows
+needs a row-masked scan, and that a per-sample check is ruled out once writes
+are in place. For this function a skipped row would now simply not reach the
+scan, and a bad row does not stop the run. In place, though, a bad row's `NA`
+would overwrite the caller's values (its "Failed samples" risk). Those points
+need another look if that thread resumes.
+
+The downstream takes `R/bmiq_calibration_fixed.R` at its next pin; no other
+copied file changed.
+
+Not run: R CMD check (user).
 
 ## 2026-09-25 — GPL (>= 3), with the upstream authors as `cph` (0.1.0)
 

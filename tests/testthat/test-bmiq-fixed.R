@@ -55,13 +55,65 @@ epic_measured <- function() {
   datM[, colSums(datM == 0) < nrow(datM)]
 }
 
-# The numerics contract of the fixed function: same NA pattern and dimnames
-# as the general function, every other element within 1e-14 (absolute).
+# The numerics contract of the fixed function, over input the general function
+# accepts: same NA pattern and dimnames, every other element within 1e-14
+# (absolute).
 expect_within_pin <- function(fixed, general) {
   expect_identical(dim(fixed), dim(general))
   expect_identical(dimnames(fixed), dimnames(general))
   expect_identical(is.na(fixed), is.na(general))
   expect_lte(max(abs(fixed - general), na.rm = TRUE), 1e-14)
+}
+
+# Samples in rows, named, as the block tests build them. No value is 0 or 1.
+synthetic_samples <- function(n_samples, n_probes = 1200L) {
+  datM <- t(vapply(
+    seq_len(n_samples),
+    function(i) {
+      clip01(simulate_beta_mixture(n_probes, nL = 3L, seed = 500L + i))
+    },
+    numeric(n_probes)
+  ))
+  dimnames(datM) <- list(
+    paste0("s", seq_len(n_samples)),
+    paste0("cg", seq_len(n_probes))
+  )
+  datM
+}
+
+# The scanner refuses each of these. The last two are not caught by the
+# +/-1e-12 tolerance on calibrated values, which is for output, not input.
+bad_values <- list(
+  na = NA_real_,
+  nan = NaN,
+  inf = Inf,
+  minus.inf = -Inf,
+  below = -1e-12,
+  above = 1 + 1e-12
+)
+
+# Each bad value in turn at one probe of one sample: one warning, that row all
+# NA (not NaN), dimnames kept, the other rows identical() to the clean run's.
+expect_sample_fails_alone <- function(datM, row, probe) {
+  clean <- bmiq_calibration_fixed(datM)
+  expect_false(anyNA(clean))
+  for (name in names(bad_values)) {
+    bad <- datM
+    bad[row, probe] <- bad_values[[name]]
+    warnings <- capture_warnings(out <- bmiq_calibration_fixed(bad))
+    expect_identical(
+      warnings,
+      "Some samples could not be calibrated and are NA.",
+      info = name
+    )
+    expect_identical(dimnames(out), dimnames(datM), info = name)
+    expect_identical(unname(out[row, ]), rep(NA_real_, ncol(datM)), info = name)
+    expect_identical(
+      out[-row, , drop = FALSE],
+      clean[-row, , drop = FALSE],
+      info = name
+    )
+  }
 }
 
 # Dense p per (component, tail), after dev/qtable-exp.R without its random
@@ -354,11 +406,6 @@ test_that("bmiq_calibration_fixed validates its inputs", {
     bmiq_calibration_fixed(as.numeric(datM)),
     regexp = "matrix"
   )
-  bad <- datM
-  bad[1L, 1L] <- NA_real_
-  expect_error(bmiq_calibration_fixed(bad), regexp = "datM")
-  bad[1L, 1L] <- 1.5
-  expect_error(bmiq_calibration_fixed(bad), regexp = "datM")
   expect_error(
     bmiq_calibration_fixed(datM[, 1:5, drop = FALSE]),
     regexp = "Too few probes"
@@ -413,6 +460,123 @@ test_that("a failed sample becomes an NA row and the others proceed", {
   # A failed sample is not also reported as calibrated in part.
   warnings <- capture_warnings(bmiq_calibration_fixed(datM))
   expect_length(warnings, 1L)
+})
+
+test_that("a sample holding a bad value fails alone", {
+  # At the last probe, so that the whole row has to be read.
+  expect_sample_fails_alone(synthetic_samples(3L), row = 2L, probe = 1200L)
+})
+
+test_that("a sample holding a bad value fails alone across the block boundary", {
+  # sample.block.size is 8, so sample 10 of 11 is in the second block, and the
+  # samples before and after it have to land in their own rows.
+  expect_sample_fails_alone(synthetic_samples(11L), row = 10L, probe = 1L)
+})
+
+test_that("a bad sample is failed before any of its work", {
+  # Estimating the two sample modes is the first work a sample does. -1e-12 is
+  # the case that would otherwise run to the end: nothing else refuses it.
+  datM <- synthetic_samples(3L)
+  datM[2L, 1L] <- -1e-12
+
+  real_mode <- fixed_estimate_mode
+  calls <- 0L
+  local_mocked_bindings(
+    fixed_estimate_mode = function(x) {
+      calls <<- calls + 1L
+      real_mode(x)
+    },
+    .package = "betanorm"
+  )
+  out <- suppressWarnings(bmiq_calibration_fixed(datM))
+
+  expect_true(all(is.na(out[2L, ])))
+  expect_identical(calls, 4L)
+})
+
+test_that("a sample holding an exact 0 and an exact 1 is calibrated", {
+  # Probe 1 is in the unmethylated class and the last in the methylated one
+  # (simulate_beta_mixture), so they run through both tails of the map.
+  clean <- bmiq_calibration_fixed(synthetic_samples(3L))
+  datM <- synthetic_samples(3L)
+  datM[2L, c(1L, 1200L)] <- c(0, 1)
+
+  expect_silent(out <- bmiq_calibration_fixed(datM))
+  expect_false(anyNA(out))
+  expect_identical(unname(out[2L, c(1L, 1200L)]), c(0, 1))
+  expect_identical(out[-2L, ], clean[-2L, ])
+  # The general function accepts this input, so the contract holds on it.
+  expect_within_pin(out, general_all_values(datM)$calibrated)
+})
+
+test_that("every sample bad gives all NA, one warning and no error", {
+  # Two blocks, every bad value in use.
+  datM <- synthetic_samples(9L)
+  for (i in seq_len(nrow(datM))) {
+    datM[i, i] <- bad_values[[(i - 1L) %% length(bad_values) + 1L]]
+  }
+  warnings <- capture_warnings(out <- bmiq_calibration_fixed(datM))
+  expect_identical(warnings, "Some samples could not be calibrated and are NA.")
+  expect_identical(
+    out,
+    matrix(
+      NA_real_,
+      nrow = nrow(datM),
+      ncol = ncol(datM),
+      dimnames = dimnames(datM)
+    )
+  )
+
+  # checkmate skips the storage-mode check when every value is missing, so a
+  # matrix(NA) of any mode comes this far too, and is coerced by the gather.
+  for (all.na in list(NA_real_, NA, NA_integer_)) {
+    datM <- matrix(all.na, nrow = 2L, ncol = 6L)
+    warnings <- capture_warnings(out <- bmiq_calibration_fixed(datM))
+    expect_identical(
+      warnings,
+      "Some samples could not be calibrated and are NA.",
+      info = typeof(all.na)
+    )
+    expect_identical(
+      out,
+      matrix(NA_real_, nrow = 2L, ncol = 6L),
+      info = typeof(all.na)
+    )
+  }
+})
+
+test_that("too few probes still stops when the matrix also holds a bad value", {
+  # About the call, not a sample: no row could be calibrated at this width.
+  datM <- matrix(0.5, nrow = 2L, ncol = 5L)
+  for (name in names(bad_values)) {
+    bad <- datM
+    bad[1L, 1L] <- bad_values[[name]]
+    expect_error(
+      bmiq_calibration_fixed(bad),
+      regexp = "^Too few probes\\.$",
+      info = name
+    )
+  }
+})
+
+test_that("bmiq_calibration stops on the values the fixed function makes NA rows of", {
+  # Why the contract with the general function ends at input it accepts.
+  gold <- horvath_fit()
+  datM <- synthetic_samples(3L)
+  for (name in names(bad_values)) {
+    bad <- datM
+    bad[2L, 1200L] <- bad_values[[name]]
+    expect_error(
+      bmiq_calibration(
+        bad,
+        gold,
+        on.sample.error = "continue",
+        verbose = FALSE
+      ),
+      regexp = "datM",
+      info = name
+    )
+  }
 })
 
 test_that("neither warning of bmiq_calibration_fixed carries a call", {

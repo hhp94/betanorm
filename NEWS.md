@@ -1,3 +1,13 @@
+# betanorm 0.1.7
+
+* The internal `bmiq_calibration_fixed()` checks values one sample at a time.
+  A sample holding `NA`, `NaN`, `Inf`, `-Inf` or a value outside [0, 1]
+  becomes a row of `NA` with the usual warning, and the other samples are
+  calibrated as before; it used to stop the whole call. An exact 0 or 1 is
+  still valid, and too few probes still stops the call. `bmiq_calibration()`
+  still stops on such values, so the two functions agree only on input
+  `bmiq_calibration()` accepts. Results on that input are unchanged.
+
 # betanorm 0.1.6
 
 * The two warnings of the internal `bmiq_calibration_fixed()` read properly

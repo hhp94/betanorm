@@ -315,10 +315,10 @@ fixed_map_beta_q <- function(x, a.sample, b.sample, gold.table, lower.tail) {
 # bmiq_calibration() at the legacy configuration (nL = 3 with H, niter = 5)
 # against a built-in gold-standard fit, with every value of the gold and of
 # each sample fitted instead of a random subset of 20000. A sample that
-# cannot be calibrated becomes a row of NA. Not exported by betanorm, and
-# no help page.
+# cannot be calibrated, or that holds a value missing, infinite or outside
+# [0, 1], becomes a row of NA. Not exported by betanorm, and no help page.
 #
-# datM: double matrix of beta values in [0, 1], samples in rows.
+# datM: double matrix of beta values, samples in rows.
 # gold: name of the built-in gold standard.
 # Returns the calibrated matrix, the size of datM.
 bmiq_calibration_fixed <- function(datM, gold = "horvath") {
@@ -329,7 +329,6 @@ bmiq_calibration_fixed <- function(datM, gold = "horvath") {
     min.rows = 1L,
     min.cols = 1L
   )
-  scan_finite_unit_interval_cpp(datM, name = "datM", require_open = FALSE)
 
   number.of.samples <- nrow(datM)
   number.of.probes <- ncol(datM)
@@ -362,6 +361,8 @@ bmiq_calibration_fixed <- function(datM, gold = "horvath") {
   failed <- rep.int(FALSE, number.of.samples)
 
   process_sample <- function(beta2.v) {
+    scan_finite_unit_interval_cpp(beta2.v, name = "datM", require_open = FALSE)
+
     mod2U <- fixed_estimate_mode(beta2.v[beta2.v < FIXED_MODE_WINDOW_LOW])
     mod2M <- fixed_estimate_mode(beta2.v[beta2.v > FIXED_MODE_WINDOW_HIGH])
 

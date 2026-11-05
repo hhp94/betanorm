@@ -31,9 +31,11 @@ What touches the input values today:
   `assert_numeric(any.missing = FALSE, finite = TRUE)` pass over `obj`
   (since chunk 1), and one over `target`. `quantile_norm_fixed()` is the
   same code, pinned `identical()`, so a change goes into both.
-- The downstream does its value scan per sample instead (DECISIONS.md,
-  2026-10-05, "divergences"), so a change here also bears on what it
-  copies.
+- `bmiq_calibration_fixed()` scans each sample as its first step, and a
+  sample it refuses is an `NA` row (DECISIONS.md, 2026-11-04). An up-front
+  pass would have to give it one verdict per row, not stop. The downstream
+  is dropping its own scan and copies this one, so a change here bears on
+  what it copies.
 
 Open questions: return the per-sample clip bounds (and the debug ranges)
 from an extended scan kernel, or keep the scan as a pure check and add a
