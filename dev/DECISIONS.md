@@ -1275,10 +1275,16 @@ others.
   `bmiq_calibration()` are unchanged, and "Validation: one owner per
   invariant" stands.
 - **A bad sample takes the failed-sample path.** Its row is `NA` (not `NaN`,
-  whatever it held), none of its work is done, and the call gives the
-  existing warning once: "Some samples could not be calibrated and are NA."
-  It has no index or value ("Plain conditions" stands), so it does not say
-  whether a sample was refused or failed later.
+  whatever it held), none of its work is done, and the call warns once.
+- **The warning now gives the cause too** (user, 2026-11-04): "Some samples
+  could not be calibrated, or hold a missing, infinite or out-of-range value,
+  and are NA." One probe missing in every sample, as a filtered probe would
+  be, makes every row `NA` under this one warning. The old stop named the
+  problem, and with the downstream's check gone nothing else does. It still
+  has no index or value ("Plain conditions" stands), so it does not say which
+  samples were refused and which failed later. A second warning for refused
+  samples was the alternative. It needs the refusal told apart from a later
+  failure, and one call could then raise both.
 - **The scan is what catches values outside [0, 1].** Measured with the scan
   removed: a sample holding `-1e-12`, `1 + 1e-12`, `1.5` or `-0.5` calibrates
   to a full row of numbers. `stats::pbeta()` reads a value below 0 as 0 and
@@ -1289,11 +1295,23 @@ others.
   shape, the stored table's check, and "Too few probes." That last one used
   to lose to the scan on a matrix that also held a bad value; now it always
   stops.
-- **An all-missing matrix of any storage mode gives `NA` rows too.**
-  `checkmate::assert_matrix(mode = "double")` skips the mode check when every
-  value is missing, so `matrix(NA, 2, 6)`, a logical matrix, passes it, and
-  only the scan used to refuse it. The gather now coerces it, and each row
-  fails the scan. An integer matrix holding any value is still refused.
+- **A matrix not stored as numeric stops once, at the front** (user,
+  2026-11-04), with "datM must be numeric." right after
+  `checkmate::assert_matrix(mode = "double")`, which skips its mode check when
+  every value is missing. So `matrix(NA, 2, 6)` and its character, complex and
+  list-of-`NULL` forms pass that assertion, and only the whole-matrix scan used
+  to refuse the logical and complex ones. With the scan per sample, those two
+  would become `NA` rows, coerced whole again for every block (400 samples by
+  20,000 probes: 0.50 s against 0.08 s for a double matrix), and the other two
+  reach Rcpp's conversion error at the gather. That error is an ordinary one at
+  `-O2`, on `eaa24ee` too. At `-O0`, as under `devtools::load_all()`, it ends
+  the process with status 127, also on `eaa24ee`, so no `tryCatch` catches it
+  and a test reaching it would end the run. Why `-O0` differs was not
+  diagnosed. Coercing with `storage.mode()` first was the alternative: it gives
+  `NA` rows for what is really the wrong type.
+- **`is.numeric()`, so an all-missing integer matrix still gives `NA` rows,**
+  coerced whole again for every block. Only that input pays. An integer matrix
+  holding any value is refused by the assertion.
 
 **The agreement contract narrows.** On these values `bmiq_calibration()`
 stops, where the fixed function now gives an `NA` row. So the contract in the
@@ -1318,19 +1336,22 @@ and `1 + 1e-12` in turn, in a sample of three and in sample 10 of 11 (the
 second block): one warning, that row all `NA`, dimnames kept, the other rows
 `identical()` to the clean run's. A bad sample never reaches the mode estimate.
 An exact 0 and 1 stay 0 and 1, within the pin to the general function. Every
-sample bad gives all `NA`, one warning and no error, as does an all-missing
-matrix of each mode. "Too few probes." stops with a bad value present, and
-`bmiq_calibration()` stops on each bad value. The two expectations in "validates
-its inputs" that a bad value stops the call are gone. All but the exact 0 and 1
-and the general function's stop fail on the old code. Six mutants built in
-memory each fail at least one test: no scan, the scan after the work,
-`require_open = TRUE`, the scan over the whole block, "Too few probes." as a
-warning, and a failed row written as `NaN`.
+sample bad gives all `NA`, one warning and no error, as do one probe missing in
+every sample and an all-missing double or integer matrix. An all-missing
+logical, character, complex or list matrix stops with "datM must be numeric."
+"Too few probes." stops with a bad value present, and `bmiq_calibration()` stops
+on each bad value. The two expectations in "validates its inputs" that a bad
+value stops the call are gone. All but the exact 0 and 1 and the general
+function's stop fail on the old code. Ten mutants built in memory each fail at
+least one test: no scan, the scan after the work, `require_open = TRUE`, the
+scan over the whole block, "Too few probes." as a warning, a failed row written
+as `NaN`, no type stop, `is.double()` for `is.numeric()`, a logical matrix let
+through, and the old warning text.
 
 **Bears on work in flight.** The up-front scan thread in `dev/to-do.md`: a pass
 before any sample would now have to give this function one verdict per row, not
-stop. `dev/in-place-blast-radius.md`, scoped before this, takes the whole-matrix
-scan as given: it says a bad row refuses the call, that exempting skipped rows
+stop. `dev/in-place-blast-radius.md`, scoped before this and now carrying a note
+at its top that points here, takes the whole-matrix scan as given: it says a bad row refuses the call, that exempting skipped rows
 needs a row-masked scan, and that a per-sample check is ruled out once writes
 are in place. For this function a skipped row would now simply not reach the
 scan, and a bad row does not stop the run. In place, though, a bad row's `NA`

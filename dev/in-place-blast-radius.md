@@ -11,6 +11,14 @@ requests for `bmiq_calibration_fixed()` and `quantile_norm_fixed()`:
 stays, so the exported function takes the same arguments as its copy. The
 rest is open; see "Open questions" at the end.
 
+**Out of date for `bmiq_calibration_fixed()`, 2026-11-04 (0.1.7).** It now
+scans each sample as that sample comes up, so a bad row is an `NA` row and
+does not refuse the call, and the scan runs after earlier blocks have been
+scattered. What this scope says about that, under "Validation of skipped
+rows" and "Not atomic", predates the change. In place, a bad row's `NA` would
+overwrite the caller's values. See "Bears on work in flight" in the entry of
+that date in DECISIONS.md. `quantile_norm_fixed()` is unchanged.
+
 ## Summary
 
 No number should move. Rows are calibrated independently, and both kernels

@@ -2,11 +2,18 @@
 
 * The internal `bmiq_calibration_fixed()` checks values one sample at a time.
   A sample holding `NA`, `NaN`, `Inf`, `-Inf` or a value outside [0, 1]
-  becomes a row of `NA` with the usual warning, and the other samples are
-  calibrated as before; it used to stop the whole call. An exact 0 or 1 is
-  still valid, and too few probes still stops the call. `bmiq_calibration()`
-  still stops on such values, so the two functions agree only on input
+  becomes a row of `NA` with a warning, and the other samples are calibrated
+  as before; it used to stop the whole call. An exact 0 or 1 is still valid,
+  and too few probes still stops the call. `bmiq_calibration()` still stops
+  on such values, so the two functions agree only on input
   `bmiq_calibration()` accepts. Results on that input are unchanged.
+* Its warning about `NA` rows now gives that cause too: "Some samples could
+  not be calibrated, or hold a missing, infinite or out-of-range value, and
+  are NA."
+* An all-missing matrix not stored as numeric, such as `matrix(NA, 2, 6)`,
+  stops it with "datM must be numeric." Before, a logical or complex one
+  stopped at the value check and a character or list one at a conversion
+  error.
 
 # betanorm 0.1.6
 

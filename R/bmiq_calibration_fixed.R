@@ -329,6 +329,10 @@ bmiq_calibration_fixed <- function(datM, gold = "horvath") {
     min.rows = 1L,
     min.cols = 1L
   )
+  # assert_matrix() skips its mode check when every value is missing.
+  if (!is.numeric(datM)) {
+    stop("datM must be numeric.")
+  }
 
   number.of.samples <- nrow(datM)
   number.of.probes <- ncol(datM)
@@ -511,7 +515,7 @@ bmiq_calibration_fixed <- function(datM, gold = "horvath") {
   }
 
   if (any(failed)) {
-    warning("Some samples could not be calibrated and are NA.", call. = FALSE)
+    warning("Some samples could not be calibrated, or hold a missing, infinite or out-of-range value, and are NA.", call. = FALSE)
   }
   if (any(!h.applied & !failed)) {
     warning("Some samples were calibrated in part, their intermediate values left as they were.", call. = FALSE)

@@ -5,11 +5,12 @@
 # for bit. Each sample is fitted on every value, in order, with no draw; the
 # general function fits a sample the same way with nfit above its length
 # and its draw replaced by the identity (local_fit_all_values()). So run,
-# against the stored gold, the output is pinned to bmiq_calibration() within
-# 1e-14: the gold side of its quantile map is a precomputed table
-# (FIXED_QTABLE, written to R/sysdata.rda by data-raw/bmiq_gold_qtable.R),
-# not stats::qbeta(), so the two are not bit-identical. The table is pinned
-# to the gold shapes and to stats::qbeta() directly.
+# against the stored gold and over input the general function accepts, the
+# output is pinned to bmiq_calibration() within 1e-14: the gold side of its
+# quantile map is a precomputed table (FIXED_QTABLE, written to R/sysdata.rda
+# by data-raw/bmiq_gold_qtable.R), not stats::qbeta(), so the two are not
+# bit-identical. The table is pinned to the gold shapes and to stats::qbeta()
+# directly.
 
 horvath_vector <- function() {
   betanorm::horvath_goldstandard[["goldstandard2"]]
@@ -65,13 +66,12 @@ expect_within_pin <- function(fixed, general) {
   expect_lte(max(abs(fixed - general), na.rm = TRUE), 1e-14)
 }
 
-# Samples in rows, named, as the block tests build them. No value is 0 or 1.
-synthetic_samples <- function(n_samples, n_probes = 1200L) {
+# Samples in rows, named, over 1200 probes. No value is 0 or 1.
+synthetic_samples <- function(n_samples) {
+  n_probes <- 1200L
   datM <- t(vapply(
     seq_len(n_samples),
-    function(i) {
-      clip01(simulate_beta_mixture(n_probes, nL = 3L, seed = 500L + i))
-    },
+    function(i) simulate_beta_mixture(n_probes, nL = 3L, seed = 500L + i),
     numeric(n_probes)
   ))
   dimnames(datM) <- list(
@@ -92,6 +92,11 @@ bad_values <- list(
   above = 1 + 1e-12
 )
 
+failed_samples_warning <- paste(
+  "Some samples could not be calibrated, or hold a missing, infinite or",
+  "out-of-range value, and are NA."
+)
+
 # Each bad value in turn at one probe of one sample: one warning, that row all
 # NA (not NaN), dimnames kept, the other rows identical() to the clean run's.
 expect_sample_fails_alone <- function(datM, row, probe) {
@@ -101,11 +106,7 @@ expect_sample_fails_alone <- function(datM, row, probe) {
     bad <- datM
     bad[row, probe] <- bad_values[[name]]
     warnings <- capture_warnings(out <- bmiq_calibration_fixed(bad))
-    expect_identical(
-      warnings,
-      "Some samples could not be calibrated and are NA.",
-      info = name
-    )
+    expect_identical(warnings, failed_samples_warning, info = name)
     expect_identical(dimnames(out), dimnames(datM), info = name)
     expect_identical(unname(out[row, ]), rep(NA_real_, ncol(datM)), info = name)
     expect_identical(
@@ -314,16 +315,7 @@ test_that("the table reproduces stats::qbeta on the real gold-side inputs", {
 test_that("bmiq_calibration_fixed reproduces bmiq_calibration across blocks", {
   # sample.block.size is 8, so 11 samples exercises a full block plus a
   # partial one.
-  n_probes <- 1200L
-  n_samples <- 11L
-  datM <- t(vapply(
-    seq_len(n_samples),
-    function(i) {
-      clip01(simulate_beta_mixture(n_probes, nL = 3L, seed = 500L + i))
-    },
-    numeric(n_probes)
-  ))
-  rownames(datM) <- paste0("s", seq_len(n_samples))
+  datM <- synthetic_samples(11L)
 
   general <- general_all_values(datM)
   fixed <- bmiq_calibration_fixed(datM)
@@ -442,10 +434,8 @@ test_that("a failed sample becomes an NA row and the others proceed", {
   bad <- pmax(good, 0.45)
   datM <- rbind(s1 = good, s2 = bad, s3 = good)
 
-  expect_warning(
-    fixed <- bmiq_calibration_fixed(datM),
-    regexp = "^Some samples could not be calibrated and are NA\\.$"
-  )
+  warnings <- capture_warnings(fixed <- bmiq_calibration_fixed(datM))
+  expect_identical(warnings, failed_samples_warning)
   expect_identical(dimnames(fixed), dimnames(datM))
   expect_true(all(is.na(fixed[2L, ])))
   expect_false(anyNA(fixed[c(1L, 3L), ]))
@@ -456,10 +446,6 @@ test_that("a failed sample becomes an NA row and the others proceed", {
   ))
   expect_identical(general$success, c(TRUE, FALSE, TRUE))
   expect_within_pin(fixed, general$calibrated)
-
-  # A failed sample is not also reported as calibrated in part.
-  warnings <- capture_warnings(bmiq_calibration_fixed(datM))
-  expect_length(warnings, 1L)
 })
 
 test_that("a sample holding a bad value fails alone", {
@@ -516,7 +502,7 @@ test_that("every sample bad gives all NA, one warning and no error", {
     datM[i, i] <- bad_values[[(i - 1L) %% length(bad_values) + 1L]]
   }
   warnings <- capture_warnings(out <- bmiq_calibration_fixed(datM))
-  expect_identical(warnings, "Some samples could not be calibrated and are NA.")
+  expect_identical(warnings, failed_samples_warning)
   expect_identical(
     out,
     matrix(
@@ -527,22 +513,54 @@ test_that("every sample bad gives all NA, one warning and no error", {
     )
   )
 
-  # checkmate skips the storage-mode check when every value is missing, so a
-  # matrix(NA) of any mode comes this far too, and is coerced by the gather.
-  for (all.na in list(NA_real_, NA, NA_integer_)) {
+  # One probe missing in every sample, as a filtered probe would be.
+  datM <- synthetic_samples(3L)
+  datM[, 100L] <- NA_real_
+  warnings <- capture_warnings(out <- bmiq_calibration_fixed(datM))
+  expect_identical(warnings, failed_samples_warning)
+  expect_true(all(is.na(out)))
+
+  # An all-missing numeric matrix is the same case. An integer one is coerced
+  # by the gather.
+  for (all.na in list(NA_real_, NA_integer_)) {
     datM <- matrix(all.na, nrow = 2L, ncol = 6L)
     warnings <- capture_warnings(out <- bmiq_calibration_fixed(datM))
-    expect_identical(
-      warnings,
-      "Some samples could not be calibrated and are NA.",
-      info = typeof(all.na)
-    )
+    expect_identical(warnings, failed_samples_warning, info = typeof(all.na))
     expect_identical(
       out,
       matrix(NA_real_, nrow = 2L, ncol = 6L),
       info = typeof(all.na)
     )
   }
+})
+
+test_that("a matrix not stored as numeric stops the call at the front", {
+  # checkmate skips its mode check when every value is missing, so these pass
+  # it. Past this stop a character or list matrix reaches Rcpp's conversion
+  # error at the gather, which ends the process in a -O0 build, under
+  # devtools::test() too.
+  for (datM in list(
+    matrix(NA, nrow = 2L, ncol = 6L),
+    matrix(NA_character_, nrow = 2L, ncol = 6L),
+    matrix(NA_complex_, nrow = 2L, ncol = 6L),
+    matrix(list(NULL), nrow = 2L, ncol = 6L)
+  )) {
+    expect_error(
+      bmiq_calibration_fixed(datM),
+      regexp = "^datM must be numeric\\.$",
+      info = typeof(datM)
+    )
+  }
+
+  # A matrix holding any value is refused by checkmate, as before.
+  expect_error(
+    bmiq_calibration_fixed(matrix("a", nrow = 2L, ncol = 6L)),
+    regexp = "double"
+  )
+  expect_error(
+    bmiq_calibration_fixed(matrix(TRUE, nrow = 2L, ncol = 6L)),
+    regexp = "double"
+  )
 })
 
 test_that("too few probes still stops when the matrix also holds a bad value", {
